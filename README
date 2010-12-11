@@ -1,0 +1,12 @@
+LOST, the Load Order Sorting Tool, is a simple and straightforward, lightweight load order manager program for Fallout New Vegas, TES IV and Fallout 3 (you do not need all, though), written in the Python programming language. It allows you to change the order in which the game engine loads plugins and masters to prevent conflicts between mods that may cause glitches or crashes.
+
+
+You need the following requirements to use LOST:
+    * Python 2.x
+    * wxPython 2.8.x
+    * Fallout New Vegas and/or Fallout 3 and/or TES IV: Oblivion
+
+
+The online documentation can be found at: <http://argomirr.webs.com/py/loadorder/docs/docs.html>
+
+All the source code is available under a Creative Commons Attribution-NonCommercial-ShareAlike 3.0 license.
