@@ -27,8 +27,11 @@ constants = {'WINDOW_HEIGHT':600,
 			'ABOUT':'LOST revision 1.0.0\n(c) 2010 Argomirr\n\n\nDesigned for Python 2.6.6 & wxPython 2.8.11.0',
 			'INI_PATH':os.getcwd() + '/settings.ini',
 			'ICO_PATH':os.getcwd() + '/lost.ico',
-			'LOST_DIR':os.getcwd()}
+			'LOST_DIR':os.getcwd(),
+			'BOSS_REL_PATH':'/Data/BOSS.exe',
+			'BOSS_REL_PATH_ALT':'/Data/BOSS/BOSS.exe'}
 			
+settings = {}			
 modeOB = 'OB'
 modeNV = 'NV'
 modeFO = 'FO3'
@@ -46,11 +49,14 @@ class UndefPanel(wx.Panel):
 		
 class LoadOrderPanel(wx.Panel):
 	'''Panel class for load order editing GUI.'''
-	def __init__(self, parent, id=wx.ID_ANY):
+	def __init__(self, parent, mode, id=wx.ID_ANY):
 		wx.Panel.__init__(self, parent, id)
+		self.mode = mode
 		
 		self.actLi = wx.ListCtrl(self, wx.ID_ANY, style=wx.LC_REPORT)
 		self.inactLi = wx.ListCtrl(self, wx.ID_ANY, style=wx.LC_REPORT)
+		self.actLi.Bind(wx.EVT_LIST_ITEM_SELECTED, self.actlist_select)
+		self.inactLi.Bind(wx.EVT_LIST_ITEM_SELECTED, self.inactlist_select)
 		
 		self.actLi.InsertColumn(0, 'Mod')
 		self.actLi.InsertColumn(1, 'Type')
@@ -64,6 +70,9 @@ class LoadOrderPanel(wx.Panel):
 		self.inactLi.SetColumnWidth(0, 180)
 		self.inactLi.SetColumnWidth(1, 100)
 		
+		self.descrBox = wx.TextCtrl(self, style=wx.TE_READONLY|wx.TE_MULTILINE)
+		self.authBox = wx.TextCtrl(self, style=wx.TE_READONLY)
+		
 		# First vsizer
 		vszr1 = wx.BoxSizer(wx.VERTICAL)
 		vszr1.Add(wx.StaticText(self, wx.ID_ANY, 'Active mods'), border=3, flag=wx.ALL|wx.EXPAND)
@@ -72,16 +81,24 @@ class LoadOrderPanel(wx.Panel):
 		# Second vsizer
 		vszr2 = wx.BoxSizer(wx.VERTICAL)
 		vszr2.Add(wx.StaticText(self, wx.ID_ANY, 'Inactive mods'), border=3, flag=wx.ALL|wx.EXPAND)
-		vszr2.Add(self.inactLi, proportion=1, border=3, flag=wx.ALL|wx.EXPAND)
+		vszr2.Add(self.inactLi, proportion=7, border=3, flag=wx.ALL|wx.EXPAND)
+		vszr2.Add(self.authBox, proportion=0, border=3, flag=wx.ALL|wx.EXPAND)
+		vszr2.Add(self.descrBox, proportion=3, border=3, flag=wx.ALL|wx.EXPAND)
 		
 		# Buttons
 		top_btn = wx.Button(self, wx.ID_ANY, label='Top')
+		top_btn.Bind(wx.EVT_BUTTON, self.move_top)
 		up_btn = wx.Button(self, wx.ID_ANY, label='Move up')
+		up_btn.Bind(wx.EVT_BUTTON, self.move_up)
 		dwn_btn = wx.Button(self, wx.ID_ANY, label='Move down')
+		dwn_btn.Bind(wx.EVT_BUTTON, self.move_down)
 		btm_btn = wx.Button(self, wx.ID_ANY, label='Bottom')
+		btm_btn.Bind(wx.EVT_BUTTON, self.move_bottom)
 		
 		act_btn = wx.Button(self, wx.ID_ANY, label='Activate')
+		act_btn.Bind(wx.EVT_BUTTON, self.activate)
 		dact_btn = wx.Button(self, wx.ID_ANY, label='Deactivate')
+		dact_btn.Bind(wx.EVT_BUTTON, self.deactivate)
 		
 		self._mcount = wx.StaticText(self, wx.ID_ANY, 'Active mod limit: 0/256', style=wx.ALIGN_RIGHT)
 		self._mcount.SetFont(wx.Font(10, wx.DEFAULT, wx.NORMAL, wx.NORMAL, False))
@@ -109,8 +126,531 @@ class LoadOrderPanel(wx.Panel):
 		sizer.AddGrowableCol(1, proportion=38)
 		sizer.AddGrowableRow(0)
 		
+		# Keypress events
+		for i in self.GetChildren():
+			i.Bind(wx.EVT_KEY_DOWN, self.handle_hotkey)
+		self.Bind(wx.EVT_KEY_DOWN, self.handle_hotkey)
+		
+		# Stuff
 		self.SetSizer(sizer)
+		self.refresh_loadorder()
+		
+	def import_loadorder(self, event=None):
+		'''Export load order to a .txt file.'''
+		loadBox = wx.FileDialog(self, message='Open', defaultDir=os.environ['USERPROFILE'], defaultFile='', style=wx.FD_OPEN, wildcard='Plain text files (*.txt)|*.txt')
+		text = ''
+		if loadBox.ShowModal() == wx.ID_OK:
+			path = loadBox.GetPath()
+			try:
+				txtf = open(path, 'rb')
+				try:
+					text = txtf.read()
+				finally:
+					txtf.close()
+			except IOError:
+				self.showErrorBox('Could not read file.')
+			loadBox.Destroy()
+			
+		
+		plugins = re.findall('.+\.{1}esm|.+\.{1}esp', text)
+		self.actLi.DeleteAllItems()
+		self.inactLi.DeleteAllItems()
 
+		if plugins != []:
+			try:
+				if self.mode == modeFO:
+					if settings['sFO_TXT'] == '' or settings['sFO_PATH'] == '':
+						self.show_error('Could not refresh load order. Check if your settings are correct.')
+						return None
+					loObj = meat.LoadOrder(settings['sFO_TXT'], settings['sFO_PATH'] + '\\Data\\', self.mode)
+				elif self.mode == modeNV:
+					if settings['sNV_TXT'] == '' or settings['sNV_PATH'] == '':
+						self.show_error('Could not refresh load order. Check if your settings are correct.')
+						return None
+					loObj = meat.LoadOrder(settings['sNV_TXT'], settings['sNV_PATH'] + '\\Data\\', self.mode)
+				else:
+					if settings['sOB_TXT'] == '' or settings['sOB_PATH'] == '':
+						self.show_error('Could not refresh load order. Check if your settings are correct.')
+						return None
+					loObj = meat.LoadOrder(settings['sOB_TXT'], settings['sOB_PATH'] + '\\Data\\', self.mode)
+			except meat.LoadOrderError:
+				self.show_error('Could not refresh load order. Check if your settings are correct.')
+			
+			loObj.list_to_loadorder(plugins)
+			
+			mods = loObj.inact
+			mods.sort()
+			
+			self.actLi.DeleteAllItems()
+			self.inactLi.DeleteAllItems()
+			for s in mods:
+				num_items = self.inactLi.GetItemCount()
+				self.inactLi.InsertStringItem(num_items, s)
+				if s.endswith('.esm'):
+					self.inactLi.SetStringItem(num_items, 1, 'Master file')
+				else:
+					self.inactLi.SetStringItem(num_items, 1, 'Plugin file')
+					
+			# get hex values
+			hexvals = []
+			
+			for i in loObj.actMasters:
+				h = str(hex(loObj.actMasters.index(i)))[2:]
+				if len(h) < 2: h = '0' + h
+				hexvals.append([i, h])
+
+			for i in loObj.actPlugins:
+				h = str(hex(loObj.actPlugins.index(i) + len(loObj.actMasters)))[2:]
+				if len(h) < 2: h = '0' + h
+				hexvals.append([i, h])
+			
+			order = []
+			order.extend(loObj.order)
+
+			for l in hexvals:
+				order[order.index(l[0])] = l
+			
+			for l in hexvals:
+				num_items = self.actLi.GetItemCount()
+				self.actLi.InsertStringItem(num_items, l[0])
+			
+				if l[0].endswith('.esm'):
+					self.actLi.SetStringItem(num_items, 1, 'Master file')
+				else:
+					self.actLi.SetStringItem(num_items, 1, 'Plugin file')
+					
+				self.actLi.SetStringItem(num_items, 2, l[1])
+			
+			self.set_mod_count(len(order))
+		
+	def export_loadorder(self, event=None):
+		'''Export load order to a .txt file.'''
+		saveBox = wx.FileDialog(self, message='Save', defaultDir=os.environ['USERPROFILE'], defaultFile='', style=wx.FD_SAVE, wildcard='Plain text files (*.txt)|*.txt')
+		if saveBox.ShowModal() == wx.ID_OK:
+			path = saveBox.GetPath()
+			data = []
+			for x in range(self.actLi.GetItemCount()):
+				data.append(self.actLi.GetItemText(x))
+			try:
+				fil = open(path, 'w')
+				try:
+					for s in data:
+						fil.write(s + '\n')
+				finally:
+					fil.close()
+			except IOError:
+				self.showErrorBox('Could not save txt file. Check if UAC is preventing the program from writing to that location.')
+		
+	def handle_hotkey(self, event=None):
+		'''Handle hotkeys.'''
+		key = event.GetKeyCode()
+		if key == 91: # [ key
+			self.move_up()
+		elif key == 39: # ' key
+			self.move_down()
+		elif key == 59: # ; key
+			self.activate()
+		elif key == 92: # \ key
+			self.deactivate()
+		else:
+			event.Skip()
+		
+	def activate(self, event=None):
+		'''Move the currently selected items to active list.'''
+		items = self.get_selected_rows(1)
+		if not items: return
+		
+		data = []
+		inactData = []
+		for x in range(self.actLi.GetItemCount()):
+			data.append(self.actLi.GetItemText(x))
+		for x in range(self.inactLi.GetItemCount()):
+			inactData.append(self.inactLi.GetItemText(x))
+
+		tmpLi = []
+		for i in items:
+			tmpLi.append(inactData[i])
+		items.reverse()
+		for i in items:
+			del inactData[i]
+		data.extend(tmpLi)
+		inactData.sort()
+
+		
+		hexvals = []
+		actMasters = []
+		actPlugins = []
+		
+		for i in data:
+			if i.endswith('.esm'):
+				actMasters.append(i)
+			else:
+				actPlugins.append(i)
+		
+		for i in actMasters:
+			h = str(hex(actMasters.index(i)))[2:]
+			if len(h) < 2: h = '0' + h
+			hexvals.append([i, h])
+
+		for i in actPlugins:
+			h = str(hex(actPlugins.index(i) + len(actMasters)))[2:]
+			if len(h) < 2: h = '0' + h
+			hexvals.append([i, h])
+
+		for l in hexvals:
+			data[data.index(l[0])] = l
+		
+		self.actLi.DeleteAllItems()
+		self.inactLi.DeleteAllItems()
+		
+		for l in inactData:
+			num_items = self.inactLi.GetItemCount()
+			self.inactLi.InsertStringItem(num_items, l)
+		
+			if l.endswith('.esm'):
+				self.inactLi.SetStringItem(num_items, 1, 'Master file')
+			else:
+				self.inactLi.SetStringItem(num_items, 1, 'Plugin file')
+
+		for l in data:
+			num_items = self.actLi.GetItemCount()
+			self.actLi.InsertStringItem(num_items, l[0])
+		
+			if l[0].endswith('.esm'):
+				self.actLi.SetStringItem(num_items, 1, 'Master file')
+			else:
+				self.actLi.SetStringItem(num_items, 1, 'Plugin file')	
+				
+			self.actLi.SetStringItem(num_items, 2, l[1])		
+			self.actLi.SetStringItem(data.index(l), 2, l[1])
+			
+		for i in range(self.actLi.GetItemCount()):
+			self.actLi.SetItemState(i, 0, wx.LIST_STATE_SELECTED|wx.LIST_STATE_FOCUSED)
+		for i in range(self.actLi.GetItemCount()-len(items), self.actLi.GetItemCount()):
+			self.actLi.SetItemState(i, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
+			self.actLi.EnsureVisible(i)
+			
+	def deactivate(self, event=None):
+		'''Move the currently selected items to inactive list.'''
+		items = self.get_selected_rows()
+		if not items: return
+		
+		data = []
+		inactData = []
+		for x in range(self.actLi.GetItemCount()):
+			data.append(self.actLi.GetItemText(x))
+		for x in range(self.inactLi.GetItemCount()):
+			inactData.append(self.inactLi.GetItemText(x))
+
+		tmpLi = []
+		for i in items:
+			tmpLi.append(data[i])
+		items.reverse()
+		for i in items:
+			del data[i]
+		inactData.extend(tmpLi)
+		inactData.sort()
+
+		
+		hexvals = []
+		actMasters = []
+		actPlugins = []
+		
+		for i in data:
+			if i.endswith('.esm'):
+				actMasters.append(i)
+			else:
+				actPlugins.append(i)
+		
+		for i in actMasters:
+			h = str(hex(actMasters.index(i)))[2:]
+			if len(h) < 2: h = '0' + h
+			hexvals.append([i, h])
+
+		for i in actPlugins:
+			h = str(hex(actPlugins.index(i) + len(actMasters)))[2:]
+			if len(h) < 2: h = '0' + h
+			hexvals.append([i, h])
+
+		for l in hexvals:
+			data[data.index(l[0])] = l
+		
+		self.actLi.DeleteAllItems()
+		self.inactLi.DeleteAllItems()
+		
+		for l in inactData:
+			num_items = self.inactLi.GetItemCount()
+			self.inactLi.InsertStringItem(num_items, l)
+		
+			if l.endswith('.esm'):
+				self.inactLi.SetStringItem(num_items, 1, 'Master file')
+			else:
+				self.inactLi.SetStringItem(num_items, 1, 'Plugin file')
+
+		for l in data:
+			num_items = self.actLi.GetItemCount()
+			self.actLi.InsertStringItem(num_items, l[0])
+		
+			if l[0].endswith('.esm'):
+				self.actLi.SetStringItem(num_items, 1, 'Master file')
+			else:
+				self.actLi.SetStringItem(num_items, 1, 'Plugin file')	
+				
+			self.actLi.SetStringItem(num_items, 2, l[1])		
+			self.actLi.SetStringItem(data.index(l), 2, l[1])
+		
+	def move_bottom(self, event=None):
+		'''Move the currently selected items to the bottom of the list.'''
+		items = self.get_selected_rows()
+		if not items: return
+		
+		data = []
+		for x in range(self.actLi.GetItemCount()):
+			data.append(self.actLi.GetItemText(x))
+
+		tmpLi = []
+		for i in items:
+			tmpLi.append(data[i])
+		for i in items:
+			del data[i]
+			
+		tmpLi.reverse()
+		for i in tmpLi:
+			data.append(i)
+
+		
+		hexvals = []
+		actMasters = []
+		actPlugins = []
+		
+		for i in data:
+			if i.endswith('.esm'):
+				actMasters.append(i)
+			else:
+				actPlugins.append(i)
+		
+		for i in actMasters:
+			h = str(hex(actMasters.index(i)))[2:]
+			if len(h) < 2: h = '0' + h
+			hexvals.append([i, h])
+
+		for i in actPlugins:
+			h = str(hex(actPlugins.index(i) + len(actMasters)))[2:]
+			if len(h) < 2: h = '0' + h
+			hexvals.append([i, h])
+
+		for l in hexvals:
+			data[data.index(l[0])] = l
+		
+		self.actLi.DeleteAllItems()
+
+		for l in data:
+			num_items = self.actLi.GetItemCount()
+			self.actLi.InsertStringItem(num_items, l[0])
+		
+			if l[0].endswith('.esm'):
+				self.actLi.SetStringItem(num_items, 1, 'Master file')
+			else:
+				self.actLi.SetStringItem(num_items, 1, 'Plugin file')	
+				
+			self.actLi.SetStringItem(num_items, 2, l[1])		
+			self.actLi.SetStringItem(data.index(l), 2, l[1])
+			
+		for i in range(self.actLi.GetItemCount()):
+			self.actLi.SetItemState(i, 0, wx.LIST_STATE_SELECTED|wx.LIST_STATE_FOCUSED)
+		for i in range(self.actLi.GetItemCount()-len(items), self.actLi.GetItemCount()):
+			self.actLi.SetItemState(i, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
+			self.actLi.EnsureVisible(i)
+	
+	def move_top(self, event=None):
+		'''Move the currently selected items to the top of the list.'''
+		items = self.get_selected_rows()
+		if not items: return
+		
+		data = []
+		for x in range(self.actLi.GetItemCount()):
+			data.append(self.actLi.GetItemText(x))
+
+		tmpLi = []
+		for i in items:
+			tmpLi.append(data[i])
+		items.reverse()
+		for i in items:
+			del data[i]
+		tmpLi.reverse()
+		for i in tmpLi:
+			data.insert(0, i)
+		
+		hexvals = []
+		actMasters = []
+		actPlugins = []
+		
+		for i in data:
+			if i.endswith('.esm'):
+				actMasters.append(i)
+			else:
+				actPlugins.append(i)
+		
+		for i in actMasters:
+			h = str(hex(actMasters.index(i)))[2:]
+			if len(h) < 2: h = '0' + h
+			hexvals.append([i, h])
+
+		for i in actPlugins:
+			h = str(hex(actPlugins.index(i) + len(actMasters)))[2:]
+			if len(h) < 2: h = '0' + h
+			hexvals.append([i, h])
+
+		for l in hexvals:
+			data[data.index(l[0])] = l
+		
+		self.actLi.DeleteAllItems()
+
+		for l in data:
+			num_items = self.actLi.GetItemCount()
+			self.actLi.InsertStringItem(num_items, l[0])
+		
+			if l[0].endswith('.esm'):
+				self.actLi.SetStringItem(num_items, 1, 'Master file')
+			else:
+				self.actLi.SetStringItem(num_items, 1, 'Plugin file')	
+				
+			self.actLi.SetStringItem(num_items, 2, l[1])		
+			self.actLi.SetStringItem(data.index(l), 2, l[1])
+			
+		for i in range(self.actLi.GetItemCount()):
+			self.actLi.SetItemState(i, 0, wx.LIST_STATE_SELECTED|wx.LIST_STATE_FOCUSED)
+		for i in range(len(items)):
+			self.actLi.SetItemState(i, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
+			self.actLi.EnsureVisible(i)
+		
+	def move_up(self, event=None):
+		'''Move the currently selected items up in the list.'''
+		items = self.get_selected_rows()
+		if not items: return	
+		
+		for i in items:
+			if not i == 0:
+				tmp = self.actLi.GetItemText(i)
+				self.actLi.SetItemText(i, self.actLi.GetItemText(i-1))
+				self.actLi.SetItemText(i-1, tmp)
+		
+		data = []
+		for x in range(self.actLi.GetItemCount()):
+			data.append(self.actLi.GetItemText(x))
+		
+		hexvals = []
+		actMasters = []
+		actPlugins = []
+		
+		for i in data:
+			if i.endswith('.esm'):
+				actMasters.append(i)
+			else:
+				actPlugins.append(i)
+		
+		for i in actMasters:
+			h = str(hex(actMasters.index(i)))[2:]
+			if len(h) < 2: h = '0' + h
+			hexvals.append([i, h])
+
+		for i in actPlugins:
+			h = str(hex(actPlugins.index(i) + len(actMasters)))[2:]
+			if len(h) < 2: h = '0' + h
+			hexvals.append([i, h])
+
+		for l in hexvals:
+			data[data.index(l[0])] = l
+		
+		for l in data:
+			if l[0].endswith('.esm'):
+				self.actLi.SetStringItem(data.index(l), 1, 'Master file')
+			else:
+				self.actLi.SetStringItem(data.index(l), 1, 'Plugin file')
+				
+			self.actLi.SetStringItem(data.index(l), 2, l[1])
+		for i in range(self.actLi.GetItemCount()):
+			self.actLi.SetItemState(i, 0, wx.LIST_STATE_SELECTED|wx.LIST_STATE_FOCUSED)
+		for i in items:
+			self.actLi.SetItemState(i-1, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
+			self.actLi.EnsureVisible(i)
+	
+	def move_down(self, event=None):
+		'''Move the currently selected items down in the list.'''
+		items = self.get_selected_rows()
+		if not items: return	
+		
+		items.reverse()
+		for i in items:
+			if not i >= self.actLi.GetItemCount() - 1:
+				tmp = self.actLi.GetItemText(i)
+				self.actLi.SetItemText(i, self.actLi.GetItemText(i+1))
+				self.actLi.SetItemText(i+1, tmp)
+		
+		data = []
+		for x in range(self.actLi.GetItemCount()):
+			data.append(self.actLi.GetItemText(x))
+		
+		hexvals = []
+		actMasters = []
+		actPlugins = []
+		
+		for i in data:
+			if i.endswith('.esm'):
+				actMasters.append(i)
+			else:
+				actPlugins.append(i)
+		
+		for i in actMasters:
+			h = str(hex(actMasters.index(i)))[2:]
+			if len(h) < 2: h = '0' + h
+			hexvals.append([i, h])
+
+		for i in actPlugins:
+			h = str(hex(actPlugins.index(i) + len(actMasters)))[2:]
+			if len(h) < 2: h = '0' + h
+			hexvals.append([i, h])
+
+		for l in hexvals:
+			data[data.index(l[0])] = l
+		
+		for l in data:
+			if l[0].endswith('.esm'):
+				self.actLi.SetStringItem(data.index(l), 1, 'Master file')
+			else:
+				self.actLi.SetStringItem(data.index(l), 1, 'Plugin file')
+				
+			self.actLi.SetStringItem(data.index(l), 2, l[1])
+		for i in range(self.actLi.GetItemCount()):
+			self.actLi.SetItemState(i, 0, wx.LIST_STATE_SELECTED|wx.LIST_STATE_FOCUSED)
+		for i in items:
+			self.actLi.SetItemState(i+1, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
+			self.actLi.EnsureVisible(i)
+		
+	def actlist_select(self, event=None):
+		'''Handle wx.EVT_LIST_ITEM_SELECTED for actLi.'''
+		self.set_mod_details(self.actLi.GetItemText(self.actLi.GetFirstSelected()))
+		
+	def inactlist_select(self, event=None):
+		'''Handle wx.EVT_LIST_ITEM_SELECTED for inactLi.'''
+		self.set_mod_details(self.inactLi.GetItemText(self.inactLi.GetFirstSelected()))
+		
+	def get_selected_rows(self, list=0):
+		'''Return a list containing the id's of every item currently selected in actLi.'''
+		res = []
+		if list == 0:	# actLi
+			if self.actLi.GetFirstSelected() != -1: 
+				i = self.actLi.GetFirstSelected()
+				while i != -1:
+					res.append(i)
+					i = self.actLi.GetNextSelected(i)
+		else:	# inactLi
+			if self.inactLi.GetFirstSelected() != -1: 
+				i = self.inactLi.GetFirstSelected()
+				while i != -1:
+					res.append(i)
+					i = self.inactLi.GetNextSelected(i)	
+		return res
 
 	def set_mod_count(self, count):
 		'''Update displayed mod count.'''
@@ -119,6 +659,124 @@ class LoadOrderPanel(wx.Panel):
 			self._mcount.SetForegroundColour(wx.RED)
 		else:
 			self._mcount.SetForegroundColour(wx.BLACK)
+			
+	def set_mod_details(self, modName):
+		'''Update description box.'''
+		if settings['bSHOW_DESCR'] == False or not modName: return
+		try:
+			if self.mode == modeFO:
+				res = meat.get_mod_details(settings['sFO_PATH'] + '\\Data\\' + modName)
+			elif self.mode == modeNV:
+				res = meat.get_mod_details(settings['sNV_PATH'] + '\\Data\\' + modName)
+			else:
+				res = meat.get_mod_details(settings['sOB_PATH'] + '\\Data\\' + modName)
+				
+			if res['author'] == '' or res['author'] == 'DEFAULT':
+				self.authBox.SetValue('Unknown')
+			else:
+				self.authBox.SetValue(res['author'])
+			if res['description'] == '':
+				if res['masters'] != '':
+					self.descrBox.SetValue('No description available.\n\n\nMASTERS:\n' + res['masters'])
+				else:
+					self.descrBox.SetValue('No description available.')
+			else:
+				self.descrBox.SetValue(res['description'] + '\n\n\nMASTERS:\n' + res['masters'])
+		except meat.TES4ModError:
+			pass
+			
+	def save_loadorder(self, event=None):
+		'''Save the load order to plugins.txt, and update timestamps.'''
+		try:
+			loadorder = []
+			for x in range(self.actLi.GetItemCount()):
+				loadorder.append(self.actLi.GetItemText(x))
+			if self.mode == modeFO:
+				loObj = meat.LoadOrder(settings['sFO_TXT'], settings['sFO_PATH'] + '\\Data\\', self.mode)
+			elif self.mode == modeNV:
+				loObj = meat.LoadOrder(settings['sNV_TXT'], settings['sNV_PATH'] + '\\Data\\', self.mode)
+			else:
+				loObj = meat.LoadOrder(settings['sOB_TXT'], settings['sOB_PATH'] + '\\Data\\', self.mode)
+			loObj.list_to_loadorder(loadorder)
+			loObj.save()
+		except meat.LoadOrderError:
+			self.show_error('Could not save load order. Check if your settings are correct, or if UAC is preventing the program from making the necessary changes.')
+		
+	def refresh_loadorder(self, event=None):
+		'''Refresh displayed load order.'''
+		try:
+			if self.mode == modeFO:
+				if settings['sFO_TXT'] == '' or settings['sFO_PATH'] == '':
+					self.show_error('Could not refresh load order. Check if your settings are correct.')
+					return None
+				loObj = meat.LoadOrder(settings['sFO_TXT'], settings['sFO_PATH'] + '\\Data\\', self.mode)
+			elif self.mode == modeNV:
+				if settings['sNV_TXT'] == '' or settings['sNV_PATH'] == '':
+					self.show_error('Could not refresh load order. Check if your settings are correct.')
+					return None
+				loObj = meat.LoadOrder(settings['sNV_TXT'], settings['sNV_PATH'] + '\\Data\\', self.mode)
+			else:
+				if settings['sOB_TXT'] == '' or settings['sOB_PATH'] == '':
+					self.show_error('Could not refresh load order. Check if your settings are correct.')
+					return None
+				loObj = meat.LoadOrder(settings['sOB_TXT'], settings['sOB_PATH'] + '\\Data\\', self.mode)
+		except meat.LoadOrderError:
+			self.show_error('Could not refresh load order. Check if your settings are correct.')
+		
+		loObj.parse()
+		
+		mods = loObj.inact
+		mods.sort()
+		
+		self.actLi.DeleteAllItems()
+		self.inactLi.DeleteAllItems()
+		for s in mods:
+			num_items = self.inactLi.GetItemCount()
+			self.inactLi.InsertStringItem(num_items, s)
+			if s.endswith('.esm'):
+				self.inactLi.SetStringItem(num_items, 1, 'Master file')
+			else:
+				self.inactLi.SetStringItem(num_items, 1, 'Plugin file')
+				
+		# get hex values
+		hexvals = []
+		
+		for i in loObj.actMasters:
+			h = str(hex(loObj.actMasters.index(i)))[2:]
+			if len(h) < 2: h = '0' + h
+			hexvals.append([i, h])
+
+		for i in loObj.actPlugins:
+			h = str(hex(loObj.actPlugins.index(i) + len(loObj.actMasters)))[2:]
+			if len(h) < 2: h = '0' + h
+			hexvals.append([i, h])
+		
+		order = []
+		order.extend(loObj.order)
+
+		for l in hexvals:
+			order[order.index(l[0])] = l
+		
+		for l in hexvals:
+			num_items = self.actLi.GetItemCount()
+			self.actLi.InsertStringItem(num_items, l[0])
+		
+			if l[0].endswith('.esm'):
+				self.actLi.SetStringItem(num_items, 1, 'Master file')
+			else:
+				self.actLi.SetStringItem(num_items, 1, 'Plugin file')
+				
+			self.actLi.SetStringItem(num_items, 2, l[1])
+		
+		self.set_mod_count(len(order))
+			
+	def show_error(self, error=''):
+		'''Display an error message.'''
+		msg = 'An error was encountered:\n' + error
+		errorBox = wx.MessageDialog(self, caption='Error', message=msg, style=wx.ICON_ERROR|wx.STAY_ON_TOP|wx.OK)
+		
+		if errorBox.ShowModal() == wx.ID_OK:
+			errorBox.Destroy()
 			
 	
 class MainFrame(wx.Frame):
@@ -140,19 +798,24 @@ class MainFrame(wx.Frame):
 			self.SetMenuBar(self.menubar)
 			
 			self.menubar.Append(menuFile, '&File')
-			saveLO = menuFile.Append(wx.ID_ANY, '&Save load order')
-			reloadLO = menuFile.Append(wx.ID_ANY, '&Refresh load order')
+			saveLO1 = menuFile.Append(wx.ID_ANY, '&Save current load order')
+			saveLO2 = menuFile.Append(wx.ID_ANY, '&Save all load orders')
+			menuFile.AppendSeparator()
+			reloadLO1 = menuFile.Append(wx.ID_ANY, '&Refresh current load order')
+			reloadLO2 = menuFile.Append(wx.ID_ANY, '&Refresh all load orders')
 			menuFile.AppendSeparator()
 			importLO = menuFile.Append(wx.ID_ANY, '&Import load order (.txt)')
 			exportLO = menuFile.Append(wx.ID_ANY, '&Export load order (.txt)')
-		#	self.Bind(wx.EVT_MENU, self.saveLoadOrder, saveLO)
-		#	self.Bind(wx.EVT_MENU, self.refreshLoadOrder, reloadLO)
-		#	self.Bind(wx.EVT_MENU, self.importLoadOrder, importLO)
-		#	self.Bind(wx.EVT_MENU, self.exportLoadOrder, exportLO)
+			self.Bind(wx.EVT_MENU, self.handle_save_single, saveLO1)
+			self.Bind(wx.EVT_MENU, self.handle_save_all, saveLO2)
+			self.Bind(wx.EVT_MENU, self.handle_refresh_single, reloadLO1)
+			self.Bind(wx.EVT_MENU, self.handle_refresh_all, reloadLO2)
+			self.Bind(wx.EVT_MENU, self.handle_import, importLO)
+			self.Bind(wx.EVT_MENU, self.handle_export, exportLO)
 			
 			self.menubar.Append(menuOptions, '&Options')
 			settingsItem = menuOptions.Append(wx.ID_ANY, '&Settings')
-		#	self.Bind(wx.EVT_MENU, self.showSettings, settingsItem)
+			self.Bind(wx.EVT_MENU, self.show_settings, settingsItem)
 			
 			self.menubar.Append(menuAbout, '&Help')
 			aboutItem = menuAbout.Append(wx.ID_ANY, '&About')
@@ -163,16 +826,16 @@ class MainFrame(wx.Frame):
 		def _init_notebook():
 			self.notebook = wx.Notebook(self, wx.ID_ANY, style=wx.NB_TOP)
 			
-			if self.settings['sNV_PATH'] and self.settings['sNV_TXT']:
-				self.panelNV = LoadOrderPanel(self.notebook)
+			if settings['sNV_PATH'] and settings['sNV_TXT']:
+				self.panelNV = LoadOrderPanel(self.notebook, modeNV)
 			else:
 				self.panelNV = UndefPanel(self.notebook)
-			if self.settings['sFO_PATH'] and self.settings['sFO_TXT']:
-				self.panelFO = LoadOrderPanel(self.notebook)
+			if settings['sFO_PATH'] and settings['sFO_TXT']:
+				self.panelFO = LoadOrderPanel(self.notebook, modeFO)
 			else:
 				self.panelFO = UndefPanel(self.notebook)
-			if self.settings['sOB_PATH'] and self.settings['sOB_TXT']:
-				self.panelOB = LoadOrderPanel(self.notebook)
+			if settings['sOB_PATH'] and settings['sOB_TXT']:
+				self.panelOB = LoadOrderPanel(self.notebook, modeOB)
 			else:
 				self.panelOB = UndefPanel(self.notebook)
 			
@@ -180,19 +843,109 @@ class MainFrame(wx.Frame):
 			self.notebook.AddPage(self.panelFO, 'Fallout 3')
 			self.notebook.AddPage(self.panelOB, 'Oblivion')
 			
-		def _init_panels():
-			pass
+			self.set_tab(settings['sDEF_MODE'])
+			
+		def _init_hotkeys():
+			for i in self.GetChildren():	# This is stupid, I know <.<
+				i.Bind(wx.EVT_KEY_DOWN, self.handle_hotkey)
+				for n in i.GetChildren():
+					n.Bind(wx.EVT_KEY_DOWN, self.handle_hotkey)
+					for m in n.GetChildren():
+						m.Bind(wx.EVT_KEY_DOWN, self.handle_hotkey)				
+			self.Bind(wx.EVT_KEY_DOWN, self.handle_hotkey)
+		
+		self.Bind(wx.EVT_CLOSE, self.handle_exit)
+		if settings['bFIRST_RUN']: self.show_settings()
 		
 		_init_menubar()
 		_init_notebook()
+		_init_hotkeys()
 		
 		self.Show()
 		
-	# Backend
+	# Backend		
+	def handle_import(self, event=None):
+		'''Call export_loadorder() on appropriate LoadOrderPanel.'''
+		if self.get_tab() == modeNV and not isinstance(self.panelNV, UndefPanel):
+			self.panelNV.import_loadorder()
+		elif self.get_tab() == modeFO and not isinstance(self.panelFO, UndefPanel):
+			self.panelFO.import_loadorder()
+		elif not isinstance(self.panelOB, UndefPanel):
+			self.panelOB.import_loadorder()
+	
+	def handle_export(self, event=None):
+		'''Call export_loadorder() on appropriate LoadOrderPanel.'''
+		if self.get_tab() == modeNV and not isinstance(self.panelNV, UndefPanel):
+			self.panelNV.export_loadorder()
+		elif self.get_tab() == modeFO and not isinstance(self.panelFO, UndefPanel):
+			self.panelFO.export_loadorder()
+		elif not isinstance(self.panelOB, UndefPanel):
+			self.panelOB.export_loadorder()
+		
+	def handle_exit(self, event=None):
+		'''Handle exit event.'''
+		if settings['bSAVE_EXIT']:
+			try:
+				self.handle_save_all()
+			except:
+				pass
+		self.Destroy()
+		sys.exit(0)
+		
+	def handle_refresh_single(self, event=None):
+		'''Call refresh_loadorder() on current panel.'''
+		if self.get_tab() == modeNV and not isinstance(self.panelNV, UndefPanel):
+			self.panelNV.refresh_loadorder()
+		elif self.get_tab() == modeFO and not isinstance(self.panelFO, UndefPanel):
+			self.panelFO.refresh_loadorder()
+		elif not isinstance(self.panelOB, UndefPanel):
+			self.panelOB.refresh_loadorder()
+			
+	def handle_refresh_all(self, event=None):
+		'''Call refresh_loadorder() on all panels.'''
+		if not isinstance(self.panelNV, UndefPanel):
+			self.panelNV.refresh_loadorder()
+		if not isinstance(self.panelFO, UndefPanel):
+			self.panelFO.refresh_loadorder()
+		if not isinstance(self.panelOB, UndefPanel):
+			self.panelOB.refresh_loadorder()
+	
+	def handle_save_single(self, event=None):
+		'''Call save_loadorder() on current panel.'''
+		if self.get_tab() == modeNV and not isinstance(self.panelNV, UndefPanel):
+			self.panelNV.save_loadorder()
+		elif self.get_tab() == modeFO and not isinstance(self.panelFO, UndefPanel):
+			self.panelFO.save_loadorder()
+		elif not isinstance(self.panelOB, UndefPanel):
+			self.panelOB.save_loadorder()
+			
+	def handle_save_all(self, event=None):
+		'''Call save_loadorder() on all panels.'''
+		if not isinstance(self.panelNV, UndefPanel):
+			self.panelNV.save_loadorder()
+		if not isinstance(self.panelFO, UndefPanel):
+			self.panelFO.save_loadorder()
+		if not isinstance(self.panelOB, UndefPanel):
+			self.panelOB.save_loadorder()
+			
+	def handle_hotkey(self, event=None):
+		'''Handle (global) hotkeys for self and children.'''
+		key = event.GetKeyCode()
+		if key == 49: # 1 key
+			self.set_tab(modeNV)
+		elif key == 50: # 2 key
+			self.set_tab(modeFO)
+		elif key == 51: # 3 key
+			self.set_tab(modeOB)
+		elif key == 27: # ESC key
+			self.handle_exit() # exit program
+		else:
+			event.Skip()
+		
 	def show_about(self, event=None):
 		'''Display some information related to the program.'''
 		aboutBox = wx.MessageDialog(self, caption='About', message=constants['ABOUT'], style=wx.ICON_INFORMATION|wx.STAY_ON_TOP|wx.OK)
-		
+
 		if aboutBox.ShowModal() == wx.ID_OK:
 			aboutBox.Destroy()
 			
@@ -202,27 +955,329 @@ class MainFrame(wx.Frame):
 		
 	def load_settings(self, event=None):
 		'''Update settings from the INI file.'''
-		try:
-			self.settings = {}
-			
+		try:			
 			ini = iniparse.ConfigParser()
 			ini.read(constants['INI_PATH'])
 			
-			self.settings['sDEF_MODE'] = ini.get('General', 'DefaultGame')
-			self.settings['bSHOW_DESCR'] = ini.getboolean('General', 'ShowDescriptions')
-			self.settings['bSAVE_EXIT'] = ini.getboolean('General', 'SaveOnExit')
-			self.settings['bFIRST_RUN'] = ini.getboolean('General', 'FirstRun')
+			settings['sDEF_MODE'] = ini.get('General', 'DefaultGame')
+			settings['bSHOW_DESCR'] = ini.getboolean('General', 'ShowDescriptions')
+			settings['bSAVE_EXIT'] = ini.getboolean('General', 'SaveOnExit')
+			settings['bFIRST_RUN'] = ini.getboolean('General', 'FirstRun')
 			
-			self.settings['sFO_PATH'] = ini.get('Paths', 'FO3Path')
-			self.settings['sOB_PATH'] = ini.get('Paths', 'OBPath')
-			self.settings['sNV_PATH'] = ini.get('Paths', 'NVPath')
+			settings['sFO_PATH'] = ini.get('Paths', 'FO3Path')
+			settings['sOB_PATH'] = ini.get('Paths', 'OBPath')
+			settings['sNV_PATH'] = ini.get('Paths', 'NVPath')
 			
-			self.settings['sOB_TXT'] = ini.get('Paths', 'OBPluginPath')
-			self.settings['sFO_TXT'] = ini.get('Paths', 'FO3PluginPath')
-			self.settings['sNV_TXT'] = ini.get('Paths', 'NVPluginPath')
+			settings['sOB_TXT'] = ini.get('Paths', 'OBPluginPath')
+			settings['sFO_TXT'] = ini.get('Paths', 'FO3PluginPath')
+			settings['sNV_TXT'] = ini.get('Paths', 'NVPluginPath')
 		except:
 			self.show_error('Failed to read ini. Check if the file is misssing or damaged.')
+			sys.exit(1)
+
+	def show_settings(self, event=None):
+		'''Invoke settings frame.'''
+		wndw = SettingsPanel(parent=self, defaults=settings)
+	
+	def get_tab(self):
+		'''Return the game tab that is currently displayed.'''
+		if self.notebook.GetSelection() == 0:
+			return modeNV
+		elif self.notebook.GetSelection() == 1:
+			return modeFO
+		else:
+			return modeOB
+		
+	def set_tab(self, mode):
+		'''Set the game tab that is currently displayed.'''
+		if mode == modeNV:
+			self.notebook.SetSelection(0)
+		elif mode == modeFO:
+			self.notebook.SetSelection(1)
+		else:
+			self.notebook.SetSelection(2)
 			
+	def show_error(self, error=''):
+		'''Display an error message.'''
+		msg = 'An error was encountered:\n' + error
+		errorBox = wx.MessageDialog(self, caption='Error', message=msg, style=wx.ICON_ERROR|wx.STAY_ON_TOP|wx.OK)
+		
+		if errorBox.ShowModal() == wx.ID_OK:
+			errorBox.Destroy()
+			
+
+# SettingsPanel class needs to be tidied some time
+class SettingsPanel(wx.Frame):
+	'''Panel for modifying INI settings.'''
+	def __init__(self, parent, panelTitle='Settings', panelSize=(450,500), defaults={}):
+		wx.Frame.__init__(self, parent, wx.ID_ANY, panelTitle, size=panelSize, style=wx.STAY_ON_TOP|wx.DEFAULT_FRAME_STYLE^(wx.MINIMIZE_BOX))
+		self.SetIcon(wx.Icon(constants['ICO_PATH'], wx.BITMAP_TYPE_ICO))
+		self.SetMinSize((300, 480))		
+		self.Center()
+		
+		backgrnd = wx.Panel(self)
+		
+		self.parent = parent
+		
+		# Default game
+		self.gameChoicesOptions = ['Fallout 3', 'Oblivion', 'New Vegas']
+		self.gameBox = wx.RadioBox(backgrnd, wx.ID_ANY, 'Default game', choices=self.gameChoicesOptions, style=wx.VERTICAL)
+		if defaults['sDEF_MODE'] == modeFO:
+			self.gameBox.SetSelection(0)
+		elif defaults['sDEF_MODE'] == modeOB:
+			self.gameBox.SetSelection(1)
+		else:
+			self.gameBox.SetSelection(2)
+		
+		# Various
+		self.saveBox = wx.RadioBox(backgrnd, wx.ID_ANY, 'Save on exit', choices=['No', 'Yes'], style=wx.VERTICAL)
+		self.descrBox = wx.RadioBox(backgrnd, wx.ID_ANY, 'Show descriptions', choices=['No', 'Yes'], style=wx.VERTICAL)
+		if defaults['bSAVE_EXIT'] == True:
+			self.saveBox.SetSelection(1)
+		else:
+			self.saveBox.SetSelection(0)
+			
+		if defaults['bSHOW_DESCR'] == True:
+			self.descrBox.SetSelection(1)
+		else:
+			self.descrBox.SetSelection(0)
+		
+		# Paths
+		# Oblivion
+		label1 = wx.StaticText(backgrnd, wx.ID_ANY, label=' Oblivion path')
+		self.OBPathBox = wx.TextCtrl(backgrnd, style=wx.TE_PROCESS_ENTER)
+		self.OBPathBox.SetValue(defaults['sOB_PATH'])
+		self.OBbrowseBtn = wx.Button(backgrnd, label='Browse')
+		self.OBbrowseBtn.Bind(wx.EVT_BUTTON, self.OBbrowse1)
+		
+		label2 = wx.StaticText(backgrnd, wx.ID_ANY, label=' Oblivion plugins.txt')
+		self.OBpluginsBox = wx.TextCtrl(backgrnd, style=wx.TE_PROCESS_ENTER)
+		self.OBpluginsBox.SetValue(defaults['sOB_TXT'])
+		self.OBsearchBtn = wx.Button(backgrnd, label='Auto')
+		self.OBsearchBtn.Bind(wx.EVT_BUTTON, self.OBpluginsPathSearch)
+		self.OBbrowseBtn2 = wx.Button(backgrnd, label='Browse')
+		self.OBbrowseBtn2.Bind(wx.EVT_BUTTON, self.OBbrowse2)
+		
+		# Fallout 3
+		label3 = wx.StaticText(backgrnd, wx.ID_ANY, label=' Fallout 3 path')
+		self.FOPathBox = wx.TextCtrl(backgrnd, style=wx.TE_PROCESS_ENTER)
+		self.FOPathBox.SetValue(defaults['sFO_PATH'])
+		self.FObrowseBtn = wx.Button(backgrnd, label='Browse')
+		self.FObrowseBtn.Bind(wx.EVT_BUTTON, self.FObrowse1)
+		
+		label4 = wx.StaticText(backgrnd, wx.ID_ANY, label=' Fallout 3 plugins.txt')
+		self.FOpluginsBox = wx.TextCtrl(backgrnd, style=wx.TE_PROCESS_ENTER)
+		self.FOpluginsBox.SetValue(defaults['sFO_TXT'])
+		self.FOsearchBtn = wx.Button(backgrnd, label='Auto')
+		self.FOsearchBtn.Bind(wx.EVT_BUTTON, self.FOpluginsPathSearch)
+		self.FObrowseBtn2 = wx.Button(backgrnd, label='Browse')
+		self.FObrowseBtn2.Bind(wx.EVT_BUTTON, self.FObrowse2)
+		
+		# New Vegas
+		label5 = wx.StaticText(backgrnd, wx.ID_ANY, label=' New Vegas path')
+		self.NVPathBox = wx.TextCtrl(backgrnd, style=wx.TE_PROCESS_ENTER)
+		self.NVPathBox.SetValue(defaults['sNV_PATH'])
+		self.NVbrowseBtn = wx.Button(backgrnd, label='Browse')
+		self.NVbrowseBtn.Bind(wx.EVT_BUTTON, self.NVbrowse1)
+		
+		label6 = wx.StaticText(backgrnd, wx.ID_ANY, label=' New Vegas plugins.txt')
+		self.NVpluginsBox = wx.TextCtrl(backgrnd, style=wx.TE_PROCESS_ENTER)
+		self.NVpluginsBox.SetValue(defaults['sNV_TXT'])
+		self.NVsearchBtn = wx.Button(backgrnd, label='Auto')
+		self.NVsearchBtn.Bind(wx.EVT_BUTTON, self.NVpluginsPathSearch)
+		self.NVbrowseBtn2 = wx.Button(backgrnd, label='Browse')
+		self.NVbrowseBtn2.Bind(wx.EVT_BUTTON, self.NVbrowse2)
+		
+		self.exitBtn = wx.Button(backgrnd, label='Save')
+		self.exitBtn.Bind(wx.EVT_BUTTON, self.exit)
+		
+		
+		# Sizers
+		# General settings
+		hBox1 = wx.BoxSizer()
+		hBox1.Add(self.gameBox, proportion=1, flag=wx.EXPAND, border=3)
+		hBox1.Add(self.saveBox, proportion=1, flag=wx.EXPAND, border=3)
+		hBox1.Add(self.descrBox, proportion=1, flag=wx.EXPAND, border=3)
+		
+		# Oblivion settings
+		hBox2 = wx.BoxSizer()
+		hBox2.Add(self.OBPathBox, proportion=3, flag=wx.EXPAND)
+		hBox2.Add(self.OBbrowseBtn, proportion=0)
+		
+		hBox3 = wx.BoxSizer()
+		hBox3.Add(self.OBpluginsBox, proportion=3, flag=wx.EXPAND)
+		hBox3.Add(self.OBsearchBtn, proportion=0)
+		hBox3.Add(self.OBbrowseBtn2, proportion=0)
+		
+		# FO settings
+		hBox4 = wx.BoxSizer()
+		hBox4.Add(self.FOPathBox, proportion=3, flag=wx.EXPAND)
+		hBox4.Add(self.FObrowseBtn, proportion=0)
+		
+		hBox5 = wx.BoxSizer()
+		hBox5.Add(self.FOpluginsBox, proportion=3, flag=wx.EXPAND)
+		hBox5.Add(self.FOsearchBtn, proportion=0)
+		hBox5.Add(self.FObrowseBtn2, proportion=0)
+		
+		# NV settings
+		hBox6 = wx.BoxSizer()
+		hBox6.Add(self.NVPathBox, proportion=3, flag=wx.EXPAND)
+		hBox6.Add(self.NVbrowseBtn, proportion=0)
+		
+		hBox7 = wx.BoxSizer()
+		hBox7.Add(self.NVpluginsBox, proportion=3, flag=wx.EXPAND)
+		hBox7.Add(self.NVsearchBtn, proportion=0)
+		hBox7.Add(self.NVbrowseBtn2, proportion=0)
+
+		
+		sizer = wx.BoxSizer(wx.VERTICAL)
+		sizer.Add(wx.StaticText(backgrnd, wx.ID_ANY, label='You may have to restart LOST in order for your changes to take effect!'), border=8, proportion=0, flag=wx.EXPAND|wx.ALL)
+		sizer.Add(hBox1, flag=wx.EXPAND|wx.ALL, border=5)
+		sizer.Add(label1, border=5, flag=wx.ALL)
+		sizer.Add(hBox2, border=3, flag=wx.EXPAND|wx.ALL)
+		sizer.Add(label2, border=5, flag=wx.ALL)
+		sizer.Add(hBox3, border=3, flag=wx.EXPAND|wx.ALL)
+		sizer.Add(label3, border=5, flag=wx.ALL)
+		sizer.Add(hBox4, border=3, flag=wx.EXPAND|wx.ALL)
+		sizer.Add(label4, border=5, flag=wx.ALL)
+		sizer.Add(hBox5, border=3, flag=wx.EXPAND|wx.ALL)
+		
+		sizer.Add(label5, border=5, flag=wx.ALL)
+		sizer.Add(hBox6, border=3, flag=wx.EXPAND|wx.ALL)
+		sizer.Add(label6, border=5, flag=wx.ALL)
+		sizer.Add(hBox7, border=3, flag=wx.EXPAND|wx.ALL)
+		
+		sizer.Add(wx.StaticLine(backgrnd, style=wx.LI_VERTICAL), border=3, proportion=0, flag=wx.EXPAND|wx.ALL)
+		sizer.Add(self.exitBtn, proportion=0, flag=wx.ALIGN_RIGHT)
+		
+		
+		backgrnd.SetSizer(sizer)
+		
+		self.Show()
+		
+		
+	# - Events
+	def OBpluginsPathSearch(self, event):
+		'''Try to determine OB plugins.txt path and paste it into the box.'''
+		if meat.get_txt_path(modeOB):
+			self.OBpluginsBox.SetValue(meat.get_txt_path(modeOB))
+		else:
+			self.OBpluginsBox.SetValue('')
+			
+	def FOpluginsPathSearch(self, event):
+		'''Try to determine OB plugins.txt path and paste it into the box.'''
+		if meat.get_txt_path(modeFO):
+			self.FOpluginsBox.SetValue(meat.get_txt_path(modeFO))
+		else:
+			self.FOpluginsBox.SetValue('')
+			
+	def NVpluginsPathSearch(self, event):
+		'''Try to determine NV plugins.txt path and paste it into the box.'''
+		if meat.get_txt_path(modeNV):
+			self.NVpluginsBox.SetValue(meat.get_txt_path(modeNV))
+		else:
+			self.NVpluginsBox.SetValue('')
+			
+	def OBbrowse1(self, event):
+		'''Browse for Oblivion directory.'''
+		self.OBPathBox.SetValue(self.browse_dir())
+		
+	def OBbrowse2(self, event):
+		'''Browse for Oblivion plugins.txt.'''
+		self.OBpluginsBox.SetValue(self.browse_file())
+		
+	def FObrowse1(self, event):
+		'''Browse for Fallout 3 directory.'''
+		self.FOPathBox.SetValue(self.browse_dir())
+		
+	def FObrowse2(self, event):
+		'''Browse for Fallout 3 plugins.txt.'''
+		self.FOpluginsBox.SetValue(self.browse_file())
+		
+	def NVbrowse1(self, event):
+		'''Browse for New Vegas directory.'''
+		self.NVPathBox.SetValue(self.browse_dir())
+		
+	def NVbrowse2(self, event):
+		'''Browse for New Vegas plugins.txt.'''
+		self.NVpluginsBox.SetValue(self.browse_file())
+		
+	def exit(self, event):
+		'''Save data to INI and destroy frame.'''
+		set = self.get_settings()
+		
+		ini = iniparse.ConfigParser()
+		ini.read(constants['INI_PATH'])
+
+		ini.set('General', 'DefaultGame', set['sDEF_MODE'])
+		ini.set('General', 'ShowDescriptions', set['bSHOW_DESCR'])
+		ini.set('General', 'SaveOnExit', set['bSAVE_EXIT'])
+		ini.set('General', 'FirstRun', 0)
+		
+		ini.set('Paths', 'FO3Path', set['sFO_PATH'])
+		ini.set('Paths', 'FO3PluginPath', set['sFO_TXT'])
+		ini.set('Paths', 'OBPath', set['sOB_PATH'])
+		ini.set('Paths', 'OBPluginPath', set['sOB_TXT'])
+		ini.set('Paths', 'NVPath', set['sNV_PATH'])
+		ini.set('Paths', 'NVPluginPath', set['sNV_TXT'])
+		
+		try:
+			fil = open(constants['INI_PATH'], 'w')
+			try:
+				ini.write(fil)
+			finally:
+				fil.close()
+		except IOError:
+			self.show_error('Failed to open settings.ini. Check if the file is misssing or damaged.')
+		
+		self.parent.load_settings()
+		self.Destroy()
+	
+	# - Backend functionality
+	def get_settings(self):
+		'''Return a dictionary containing the settings the user entered.'''
+		settings = {}
+		if self.gameBox.GetSelection() == 0:
+			settings['sDEF_MODE'] = modeFO
+		elif self.gameBox.GetSelection() == 1:
+			settings['sDEF_MODE'] = modeOB
+		else:
+			settings['sDEF_MODE'] = modeNV
+			
+		settings['bSHOW_DESCR'] = self.descrBox.GetSelection()
+		settings['bSAVE_EXIT'] = self.saveBox.GetSelection()
+		settings['bFIRST_RUN'] = False
+		
+		settings['sFO_PATH'] = self.FOPathBox.GetValue()
+		settings['sOB_PATH'] = self.OBPathBox.GetValue()
+		settings['sNV_PATH'] = self.NVPathBox.GetValue()
+		
+		settings['sOB_TXT'] = self.OBpluginsBox.GetValue()
+		settings['sFO_TXT'] = self.FOpluginsBox.GetValue()
+		settings['sNV_TXT'] = self.NVpluginsBox.GetValue()
+		
+		return settings
+		
+	def browse_file(self):
+		'''Display browse box and return chosen path.'''
+		path  = ''
+		browseBox = wx.FileDialog(self, message='Browse', defaultDir=os.environ['USERPROFILE'], wildcard='Plain text files (*.txt)|*.txt')
+		
+		if browseBox.ShowModal() == wx.ID_OK:
+			path = browseBox.GetPath()
+			browseBox.Destroy()
+		return path
+		
+	def browse_dir(self):
+		'''Display dir browse box and return chosen path.'''
+		path  = ''
+		browseBox = wx.DirDialog(self, message='Browse', defaultPath='C:\\')
+		
+		if browseBox.ShowModal() == wx.ID_OK:
+			path = browseBox.GetPath()
+			browseBox.Destroy()
+		return path
+
 	def show_error(self, error=''):
 		'''Display an error message.'''
 		msg = 'An error was encountered:\n' + error
