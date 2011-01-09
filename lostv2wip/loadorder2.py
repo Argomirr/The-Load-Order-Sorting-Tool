@@ -135,6 +135,19 @@ class LoadOrderPanel(wx.Panel):
 		self.SetSizer(sizer)
 		self.refresh_loadorder()
 		
+	def loadorder_to_clipboard(self):
+		'''Copy loadorder to clipboard.'''
+		if	wx.TheClipboard.Open():
+			data = []
+			for x in range(self.actLi.GetItemCount()):
+				data.append(self.actLi.GetItemText(x) + '\n')
+			data = ''.join(data)
+			print data
+		
+			wx.TheClipboard.Clear()
+			wx.TheClipboard.SetData(wx.TextDataObject(data))
+			wx.TheClipboard.Close()
+		
 	def import_loadorder(self, event=None):
 		'''Export load order to a .txt file.'''
 		loadBox = wx.FileDialog(self, message='Open', defaultDir=os.environ['USERPROFILE'], defaultFile='', style=wx.FD_OPEN, wildcard='Plain text files (*.txt)|*.txt')
@@ -806,12 +819,14 @@ class MainFrame(wx.Frame):
 			menuFile.AppendSeparator()
 			importLO = menuFile.Append(wx.ID_ANY, '&Import load order (.txt)')
 			exportLO = menuFile.Append(wx.ID_ANY, '&Export load order (.txt)')
+			clipboardLO = menuFile.Append(wx.ID_ANY, '&Copy load order to clipboard')
 			self.Bind(wx.EVT_MENU, self.handle_save_single, saveLO1)
 			self.Bind(wx.EVT_MENU, self.handle_save_all, saveLO2)
 			self.Bind(wx.EVT_MENU, self.handle_refresh_single, reloadLO1)
 			self.Bind(wx.EVT_MENU, self.handle_refresh_all, reloadLO2)
 			self.Bind(wx.EVT_MENU, self.handle_import, importLO)
 			self.Bind(wx.EVT_MENU, self.handle_export, exportLO)
+			self.Bind(wx.EVT_MENU, self.handle_clipboard, clipboardLO)
 			
 			self.menubar.Append(menuOptions, '&Options')
 			settingsItem = menuOptions.Append(wx.ID_ANY, '&Settings')
@@ -863,7 +878,16 @@ class MainFrame(wx.Frame):
 		
 		self.Show()
 		
-	# Backend		
+	# Backend
+	def handle_clipboard(self, event=None):
+		'''Call loadorder_to_clipboard() on appropriate LoadOrderPanel.'''
+		if self.get_tab() == modeNV and not isinstance(self.panelNV, UndefPanel):
+			self.panelNV.loadorder_to_clipboard()
+		elif self.get_tab() == modeFO and not isinstance(self.panelFO, UndefPanel):
+			self.panelFO.loadorder_to_clipboard()
+		elif not isinstance(self.panelOB, UndefPanel):
+			self.panelOB.loadorder_to_clipboard()
+	
 	def handle_import(self, event=None):
 		'''Call export_loadorder() on appropriate LoadOrderPanel.'''
 		if self.get_tab() == modeNV and not isinstance(self.panelNV, UndefPanel):
