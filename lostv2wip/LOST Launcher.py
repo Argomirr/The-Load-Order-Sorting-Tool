@@ -13,9 +13,9 @@ __copyright__ = 'Copyright (c) 2010 Argomirr'
 # -- IMPORTS
 from traceback import print_exc
 try:
-	import wx
-
 	import loadorder2
+
+	import wx
 
 
 	def main():

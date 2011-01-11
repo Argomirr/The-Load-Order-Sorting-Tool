@@ -8,15 +8,16 @@ __copyright__ = 'Copyright (c) 2010 Argomirr'
 
 
 # -- IMPORTS
+import meat
+import boss
+
 import os
 import sys
 import re
 import webbrowser
 
 import iniparse
-import wx
-
-import meat
+import wx, wx.html
 
 
 # -- CONSTANTS
@@ -28,8 +29,16 @@ constants = {'WINDOW_HEIGHT':600,
 			'INI_PATH':os.getcwd() + '/settings.ini',
 			'ICO_PATH':os.getcwd() + '/lost.ico',
 			'LOST_DIR':os.getcwd(),
-			'BOSS_REL_PATH':'/Data/BOSS.exe',
-			'BOSS_REL_PATH_ALT':'/Data/BOSS/BOSS.exe'}
+			'BOSS_START_PAGE':'''<html><body><center><h3>Better Oblivion Sorting Software</h3>BOSS is &copy; Random007 &amp; the BOSS development team, 2009-2010. Some rights reserved.</center><br><br>
+								<p><i>Better Oblivion Sorting Software (BOSS) will reorder your mods to their correct positions (as listed in the masterlist.txt database file), putting any mods it doesn't
+								 recognise after them, in the same order as they were before BOSS was run.
+								BOSS is designed to assist in the installation and usage of mods, especially more complex mods such as FCOM and MMM, and help mod users avoid serious conflicts. It is not a complete solution to load ordering issues, 
+								as there are far more mods out there (estimated at about 30,000) than BOSS knows about. To properly place mods BOSS doesn't know about, a good working knowledge of Oblivion mod load ordering is still necessary, 
+								for which some research and documentation reading will go a long way.</i></p>
+								<br><br><p><b>Quick links</b><ul><li><a href='http://www.tesnexus.com/downloads/file.php?id=20516'>BOSS on TESNexus</a>
+								<li><a href='http://code.google.com/p/better-oblivion-sorting-software/'>BOSS Google Code pages</a>
+								</ul><br><br><p>For both legal and practical reasons, BOSS is not included in the LOST package. If you want to make use of the integrated BOSS interface, download
+								the BOSS installer from TESNexus. (See quick links)</p></body></html>'''}
 			
 settings = {}			
 modeOB = 'OB'
@@ -46,6 +55,23 @@ class UndefPanel(wx.Panel):
 		szr.Add(wx.StaticText(self, wx.ID_ANY, 'It appears you have not configured your settings for this game.', style=wx.ALIGN_CENTER), flag=wx.EXPAND|wx.ALIGN_CENTER)
 		self.SetSizer(szr)
 		
+		
+class BaseFrame(wx.Frame):
+	'''Base frame from which other frames in LOST derive.'''
+	def show_error(self, error=''):
+		'''Display an error message.'''
+		msg = 'An error was encountered:\n' + error
+		errorBox = wx.MessageDialog(self, caption='Error', message=msg, style=wx.ICON_ERROR|wx.STAY_ON_TOP|wx.OK)
+		
+		if errorBox.ShowModal() == wx.ID_OK:
+			errorBox.Destroy()
+			
+	def show_message(self, msg=''):
+		'''Display a message.'''
+		box = wx.MessageDialog(self, caption='Load Order Sorting Tool', message=msg, style=wx.ICON_INFORMATION|wx.STAY_ON_TOP|wx.OK)
+		
+		if box.ShowModal() == wx.ID_OK:
+			box.Destroy()
 		
 class LoadOrderPanel(wx.Panel):
 	'''Panel class for load order editing GUI.'''
@@ -132,6 +158,7 @@ class LoadOrderPanel(wx.Panel):
 		self.Bind(wx.EVT_KEY_DOWN, self.handle_hotkey)
 		
 		# Stuff
+		self.sizer = sizer # So the show_descr_box method can update the sizer
 		self.SetSizer(sizer)
 		self.refresh_loadorder()
 		
@@ -252,19 +279,23 @@ class LoadOrderPanel(wx.Panel):
 				finally:
 					fil.close()
 			except IOError:
-				self.showErrorBox('Could not save txt file. Check if UAC is preventing the program from writing to that location.')
+				self.show_error('Could not save txt file. Check if UAC is preventing the program from writing to that location.')
 		
 	def handle_hotkey(self, event=None):
 		'''Handle hotkeys.'''
 		key = event.GetKeyCode()
-		if key == 91: # [ key
+		if key == 332: # Num-8 key
 			self.move_up()
-		elif key == 39: # ' key
+		elif key == 326: # Num-2 key
 			self.move_down()
-		elif key == 59: # ; key
+		elif key == 328: # Num-4 key
 			self.activate()
-		elif key == 92: # \ key
+		elif key == 330: # Num-6 key
 			self.deactivate()
+		elif key == 331: # Num-7 key
+			self.move_top()
+		elif key == 325: # Num-1 key
+			self.move_bottom()
 		else:
 			event.Skip()
 		
@@ -342,6 +373,8 @@ class LoadOrderPanel(wx.Panel):
 		for i in range(self.actLi.GetItemCount()-len(items), self.actLi.GetItemCount()):
 			self.actLi.SetItemState(i, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
 			self.actLi.EnsureVisible(i)
+		
+		self.set_mod_count(self.actLi.GetItemCount())
 			
 	def deactivate(self, event=None):
 		'''Move the currently selected items to inactive list.'''
@@ -411,6 +444,8 @@ class LoadOrderPanel(wx.Panel):
 				
 			self.actLi.SetStringItem(num_items, 2, l[1])		
 			self.actLi.SetStringItem(data.index(l), 2, l[1])
+			
+		self.set_mod_count(self.actLi.GetItemCount())
 		
 	def move_bottom(self, event=None):
 		'''Move the currently selected items to the bottom of the list.'''
@@ -587,6 +622,7 @@ class LoadOrderPanel(wx.Panel):
 		for i in items:
 			self.actLi.SetItemState(i-1, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
 			self.actLi.EnsureVisible(i)
+			
 	
 	def move_down(self, event=None):
 		'''Move the currently selected items down in the list.'''
@@ -639,6 +675,7 @@ class LoadOrderPanel(wx.Panel):
 		for i in items:
 			self.actLi.SetItemState(i+1, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
 			self.actLi.EnsureVisible(i)
+			
 		
 	def actlist_select(self, event=None):
 		'''Handle wx.EVT_LIST_ITEM_SELECTED for actLi.'''
@@ -672,6 +709,8 @@ class LoadOrderPanel(wx.Panel):
 			self._mcount.SetForegroundColour(wx.RED)
 		else:
 			self._mcount.SetForegroundColour(wx.BLACK)
+			
+		self.sizer.Layout()
 			
 	def set_mod_details(self, modName):
 		'''Update description box.'''
@@ -791,8 +830,18 @@ class LoadOrderPanel(wx.Panel):
 		if errorBox.ShowModal() == wx.ID_OK:
 			errorBox.Destroy()
 			
+	def show_descr_box(self, val=True):
+		'''Set visibility of description and author boxes.'''
+		if val:
+			self.authBox.Show()
+			self.descrBox.Show()
+		else:
+			self.authBox.Hide()
+			self.descrBox.Hide()
+		self.sizer.Layout()
+			
 	
-class MainFrame(wx.Frame):
+class MainFrame(BaseFrame):
 	'''Main frame class for LOST app.'''
 	def __init__(self):
 		wx.Frame.__init__(self, None, title=constants['WINDOW_TITLE'], size=(constants['WINDOW_WIDTH'], constants['WINDOW_HEIGHT']), style=wx.DEFAULT_FRAME_STYLE, id=wx.ID_ANY)	
@@ -806,6 +855,7 @@ class MainFrame(wx.Frame):
 			self.menubar = wx.MenuBar()
 			menuFile = wx.Menu()
 			menuOptions = wx.Menu()
+			menuTools = wx.Menu()
 			menuAbout = wx.Menu()
 			
 			self.SetMenuBar(self.menubar)
@@ -831,6 +881,10 @@ class MainFrame(wx.Frame):
 			self.menubar.Append(menuOptions, '&Options')
 			settingsItem = menuOptions.Append(wx.ID_ANY, '&Settings')
 			self.Bind(wx.EVT_MENU, self.show_settings, settingsItem)
+			
+			self.menubar.Append(menuTools, '&Tools')
+			bossItem = menuTools.Append(wx.ID_ANY, '&BOSS')
+			self.Bind(wx.EVT_MENU, self.show_boss, bossItem)
 			
 			self.menubar.Append(menuAbout, '&Help')
 			aboutItem = menuAbout.Append(wx.ID_ANY, '&About')
@@ -1001,7 +1055,11 @@ class MainFrame(wx.Frame):
 
 	def show_settings(self, event=None):
 		'''Invoke settings frame.'''
-		wndw = SettingsPanel(parent=self, defaults=settings)
+		wndw = SettingsFrame(parent=self, defaults=settings)
+		
+	def show_boss(self, event=None):
+		'''Invoke BOSS frame.'''
+		wndw = BOSSFrame(self, defGame=self.get_tab())
 	
 	def get_tab(self):
 		'''Return the game tab that is currently displayed.'''
@@ -1021,18 +1079,27 @@ class MainFrame(wx.Frame):
 		else:
 			self.notebook.SetSelection(2)
 			
-	def show_error(self, error=''):
-		'''Display an error message.'''
-		msg = 'An error was encountered:\n' + error
-		errorBox = wx.MessageDialog(self, caption='Error', message=msg, style=wx.ICON_ERROR|wx.STAY_ON_TOP|wx.OK)
-		
-		if errorBox.ShowModal() == wx.ID_OK:
-			errorBox.Destroy()
+	def handle_setting_update(self):
+		'''Apply new settings to GUI.'''
+		if settings['bSHOW_DESCR']:
+			if not isinstance(self.panelNV, UndefPanel):
+				self.panelNV.show_descr_box()
+			if not isinstance(self.panelFO, UndefPanel):
+				self.panelFO.show_descr_box()
+			if not isinstance(self.panelOB, UndefPanel):
+				self.panelOB.show_descr_box()
+		else:
+			if not isinstance(self.panelNV, UndefPanel):
+				self.panelNV.show_descr_box(False)
+			if not isinstance(self.panelFO, UndefPanel):
+				self.panelFO.show_descr_box(False)
+			if not isinstance(self.panelOB, UndefPanel):
+				self.panelOB.show_descr_box(False)
 			
 
-# SettingsPanel class needs to be tidied some time
-class SettingsPanel(wx.Frame):
-	'''Panel for modifying INI settings.'''
+# SettingsFrame class needs to be tidied some time
+class SettingsFrame(BaseFrame):
+	'''Frame for modifying INI settings.'''
 	def __init__(self, parent, panelTitle='Settings', panelSize=(450,500), defaults={}):
 		wx.Frame.__init__(self, parent, wx.ID_ANY, panelTitle, size=panelSize, style=wx.STAY_ON_TOP|wx.DEFAULT_FRAME_STYLE^(wx.MINIMIZE_BOX))
 		self.SetIcon(wx.Icon(constants['ICO_PATH'], wx.BITMAP_TYPE_ICO))
@@ -1255,6 +1322,7 @@ class SettingsPanel(wx.Frame):
 			self.show_error('Failed to open settings.ini. Check if the file is misssing or damaged.')
 		
 		self.parent.load_settings()
+		self.parent.handle_setting_update()
 		self.Destroy()
 	
 	# - Backend functionality
@@ -1284,7 +1352,7 @@ class SettingsPanel(wx.Frame):
 		
 	def browse_file(self):
 		'''Display browse box and return chosen path.'''
-		path  = ''
+		path = ''
 		browseBox = wx.FileDialog(self, message='Browse', defaultDir=os.environ['USERPROFILE'], wildcard='Plain text files (*.txt)|*.txt')
 		
 		if browseBox.ShowModal() == wx.ID_OK:
@@ -1294,25 +1362,221 @@ class SettingsPanel(wx.Frame):
 		
 	def browse_dir(self):
 		'''Display dir browse box and return chosen path.'''
-		path  = ''
+		path = ''
 		browseBox = wx.DirDialog(self, message='Browse', defaultPath='C:\\')
 		
 		if browseBox.ShowModal() == wx.ID_OK:
 			path = browseBox.GetPath()
 			browseBox.Destroy()
 		return path
+			
+class SimplerHtmlWindow(wx.html.HtmlWindow):
+	'''wx.html.HtmlWindow that opens hyperlinks in webbrowser.'''
+	def OnLinkClicked(self, event=None):
+		'''Open selected hyperlink in webbrowser.'''
+		webbrowser.open_new_tab(event.GetHref())
 
-	def show_error(self, error=''):
-		'''Display an error message.'''
-		msg = 'An error was encountered:\n' + error
-		errorBox = wx.MessageDialog(self, caption='Error', message=msg, style=wx.ICON_ERROR|wx.STAY_ON_TOP|wx.OK)
+			
+class BOSSFrame(BaseFrame):
+	def __init__(self, parent, title='BOSS interface', size=(750,600), defGame=modeNV):
+		wx.Frame.__init__(self, parent, wx.ID_ANY, title, size=size, style=wx.DEFAULT_FRAME_STYLE)
+		self.SetIcon(wx.Icon(constants['ICO_PATH'], wx.BITMAP_TYPE_ICO))
+		self.SetMinSize((700, 400))		
+		self.Center()
 		
-		if errorBox.ShowModal() == wx.ID_OK:
-			errorBox.Destroy()
+		self.panel = wx.Panel(self)
+		self.parent = parent
 		
+		subpanel = wx.Panel(self.panel, style=wx.SUNKEN_BORDER)
+		self.html = SimplerHtmlWindow(subpanel)
+		self.log_select = wx.ComboBox(self.panel, wx.ID_ANY, choices=['Quick links', 'New Vegas', 'Fallout 3', 'Oblivion'], style=wx.CB_READONLY)
+		self.log_select.SetSelection(0)
+		self.log_select.Bind(wx.EVT_COMBOBOX, self.switch_log)
+		
+		subpanelszr = wx.BoxSizer(wx.VERTICAL)
+		subpanelszr.Add(self.html, proportion=1, flag=wx.EXPAND|wx.ALL)
+		subpanel.SetSizer(subpanelszr)
+		
+		# Controls
+		sort_btn = wx.Button(self.panel, label='Run BOSS')
+		sort_btn.Bind(wx.EVT_BUTTON, self.boss_run)
+		self.sort_opt = wx.ComboBox(self.panel, wx.ID_ANY, choices=['New Vegas', 'Fallout 3', 'Oblivion'], style=wx.CB_READONLY)
+		if defGame == modeNV:
+			self.sort_opt.SetSelection(0)
+		elif defGame == modeFO:
+			self.sort_opt.SetSelection(1)
+		else:
+			self.sort_opt.SetSelection(2)
+		
+		revert_btn = wx.Button(self.panel, label='Revert changes')
+		revert_btn.Bind(wx.EVT_BUTTON, self.boss_revert)
+		self.revert_opt = wx.ComboBox(self.panel, wx.ID_ANY, choices=['1', '2'], style=wx.CB_READONLY)
+		self.revert_opt.SetSelection(0)
+		
+		update_btn = wx.Button(self.panel, label='Update masterlists')
+		update_btn.Bind(wx.EVT_BUTTON, self.boss_update)
+		
+		vbox = wx.BoxSizer(wx.VERTICAL)
+		
+		vbox.Add(sort_btn, border=3, flag=wx.ALL|wx.EXPAND)
+		vbox.Add(wx.StaticText(self.panel, label='Currently running BOSS on'), border=1, flag=wx.ALL)
+		vbox.Add(self.sort_opt, border=3, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
+		vbox.Add(wx.StaticLine(self.panel), border=8, flag=wx.ALL|wx.EXPAND)
+		
+		vbox.Add(revert_btn, border=3, flag=wx.ALL|wx.EXPAND)
+		vbox.Add(wx.StaticText(self.panel, label='Revert level'), border=1, flag=wx.ALL)
+		vbox.Add(self.revert_opt, border=3, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
+		vbox.Add(wx.StaticLine(self.panel), border=8, flag=wx.ALL|wx.EXPAND)
+		
+		vbox.Add(update_btn, border=3, flag=wx.ALL|wx.EXPAND)
+		
+		vbox.Add(wx.StaticLine(self.panel), border=8, flag=wx.ALL|wx.EXPAND)
+		vbox.Add(wx.StaticText(self.panel, label='Display log'), border=1, flag=wx.ALL)
+		vbox.Add(self.log_select, border=3, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
+		
+		sizer = wx.BoxSizer()
+		sizer.Add(vbox, proportion=0, border=3, flag=wx.ALL|wx.EXPAND)
+		sizer.Add(subpanel, proportion=1, border=3, flag=wx.EXPAND|wx.ALL)
+		
+		self.panel.SetSizer(sizer)
+		self.Show()
+		
+		self.set_log(constants['BOSS_START_PAGE'])
+		
+	def set_log(self, source):
+		'''Set the HTML to be displayed.'''
+		self.html.SetPage(source)		
+		
+	def switch_log(self, event=None):
+		path = ''
+		
+		if self.log_select.GetCurrentSelection() == 0:
+			self.set_log(constants['BOSS_START_PAGE'])
+		elif self.log_select.GetCurrentSelection() == 1:
+			if settings['sNV_PATH']:
+				path = settings['sNV_PATH']
+			else:
+				self.show_error('Your settings for this game have not been set properly.')
+		elif self.log_select.GetCurrentSelection() == 2:
+			if settings['sFO_PATH']:
+				path = settings['sFO_PATH']
+			else:
+				self.show_error('Your settings for this game have not been set properly.')
+		elif self.log_select.GetCurrentSelection() == 3:
+			if settings['sOB_PATH']:
+				path = settings['sOB_PATH']
+			else:
+				self.show_error('Your settings for this game have not been set properly.')	
+		try:
+			bossexe = boss.BOSS(path)			
+			log = bossexe.get_log()
+			
+			if log:
+				self.set_log(log)
+			else:
+				self.set_log('BOSSLog could not be read.')		
+		except boss.BOSSNotInstalledError:
+			pass
+		
+	def boss_revert(self, event=None):
+		level = self.revert_opt.GetCurrentSelection() + 1
+
+		if self.sort_opt.GetCurrentSelection() == 0:
+			if settings['sNV_PATH']:
+				path = settings['sNV_PATH']
+			else:
+				self.show_error('Your settings for this game have not been set properly.')
+		elif self.sort_opt.GetCurrentSelection() == 1:
+			if settings['sFO_PATH']:
+				path = settings['sFO_PATH']
+			else:
+				self.show_error('Your settings for this game have not been set properly.')
+		elif self.sort_opt.GetCurrentSelection() == 2:
+			if settings['sOB_PATH']:
+				path = settings['sOB_PATH']
+			else:
+				self.show_error('Your settings for this game have not been set properly.')
+				
+		try:
+			bossexe = boss.BOSS(path)
+			bossexe.revert(level)
+			
+			log = bossexe.get_log()
+			if log:
+				self.set_log(log)
+			else:
+				self.set_log('BOSSLog could not be read.')
+				
+			self.parent.handle_refresh_all()
+			self.show_message('BOSS has been run. LOST will now display the log.')
+			
+		except boss.BOSSNotInstalledError:
+			self.show_error('You have not installed BOSS for this game.')
+				
+		
+	def boss_update(self, event=None):
+		res = ''
+		try:
+			bossexe = boss.BOSS(settings['sNV_PATH'])
+			x = bossexe.update()
+			if x:
+				res += 'BOSS-NV masterlist was updated to revision %s\n' % x
+		except:
+			pass
+		try:
+			bossexe = boss.BOSS(settings['sFO_PATH'])
+			x = bossexe.update()
+			if x:
+				res += 'BOSS-F masterlist was updated to revision %s\n' % x
+		except:
+			pass
+		try:
+			bossexe = boss.BOSS(settings['sOB_PATH'])
+			x = bossexe.update()
+			if x:
+				res += 'BOSS-OB masterlist was updated to revision %s\n' % x
+		except:
+			pass
+		
+		if res:
+			self.show_message(res)
+		
+	def boss_run(self, event=None):
+		if self.sort_opt.GetCurrentSelection() == 0:
+			if settings['sNV_PATH']:
+				path = settings['sNV_PATH']
+			else:
+				self.show_error('Your settings for this game have not been set properly.')
+		elif self.sort_opt.GetCurrentSelection() == 1:
+			if settings['sFO_PATH']:
+				path = settings['sFO_PATH']
+			else:
+				self.show_error('Your settings for this game have not been set properly.')
+		elif self.sort_opt.GetCurrentSelection() == 2:
+			if settings['sOB_PATH']:
+				path = settings['sOB_PATH']
+			else:
+				self.show_error('Your settings for this game have not been set properly.')
+				
+		try:
+			bossexe = boss.BOSS(path)
+			bossexe.run()
+			
+			log = bossexe.get_log()
+			if log:
+				self.set_log(log)
+			else:
+				self.set_log('BOSSLog could not be read.')
+				
+			self.parent.handle_refresh_all()
+			self.show_message('BOSS has been run. LOST will now display the log.')
+			
+		except boss.BOSSNotInstalledError:
+			self.show_error('You have not installed BOSS for this game.')
+			
 		
 class LOSTApp(wx.App):
-	'''wx.App convenience wrapper. Launches a loadorder.MainFrame instance when initialized.'''
+	'''wx.App convenience wrapper. Launches a loadorder2.MainFrame instance when initialized.'''
 	def OnInit(self):
 		frame = MainFrame()
 		return True
