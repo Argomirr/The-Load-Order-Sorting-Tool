@@ -25,9 +25,9 @@ constants = {'WINDOW_HEIGHT':600,
 			'WINDOW_WIDTH':800,
 			'WINDOW_TITLE':'The Load Order Sorting Tool',
 			'DOCS_LOC':'http://argomirr.webs.com/py/loadorder/docs/docs.html',
-			'ABOUT':'LOST revision 1.0.0\n(c) 2010 Argomirr\n\n\nDesigned for Python 2.6.6 & wxPython 2.8.11.0',
-			'INI_PATH':os.getcwd() + '/settings.ini',
-			'ICO_PATH':os.getcwd() + '/lost.ico',
+			'ABOUT':'LOST revision 1.0.1\n(c) 2010 Argomirr\n\n\nDesigned for Python 2.6.6 & wxPython 2.8.11.0',
+			'INI_PATH':os.getcwd() + '\settings.ini',
+			'ICO_PATH':os.getcwd() + '\lost.ico',
 			'LOST_DIR':os.getcwd(),
 			'BOSS_START_PAGE':'''<html><body><center><h3>Better Oblivion Sorting Software</h3>BOSS is &copy; Random007 &amp; the BOSS development team, 2009-2010. Some rights reserved.</center><br><br>
 								<p><i>Better Oblivion Sorting Software (BOSS) will reorder your mods to their correct positions (as listed in the masterlist.txt database file), putting any mods it doesn't
@@ -620,8 +620,9 @@ class LoadOrderPanel(wx.Panel):
 		for i in range(self.actLi.GetItemCount()):
 			self.actLi.SetItemState(i, 0, wx.LIST_STATE_SELECTED|wx.LIST_STATE_FOCUSED)
 		for i in items:
-			self.actLi.SetItemState(i-1, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
-			self.actLi.EnsureVisible(i)
+			if not i == 0:
+				self.actLi.SetItemState(i-1, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
+				self.actLi.EnsureVisible(i)
 			
 	
 	def move_down(self, event=None):
@@ -792,22 +793,18 @@ class LoadOrderPanel(wx.Panel):
 				
 		# get hex values
 		hexvals = []
-		
-		for i in loObj.actMasters:
-			h = str(hex(loObj.actMasters.index(i)))[2:]
-			if len(h) < 2: h = '0' + h
-			hexvals.append([i, h])
-
-		for i in loObj.actPlugins:
-			h = str(hex(loObj.actPlugins.index(i) + len(loObj.actMasters)))[2:]
+		for i in loObj.order:
+			h = str(hex(loObj.order.index(i)))[2:]
 			if len(h) < 2: h = '0' + h
 			hexvals.append([i, h])
 		
 		order = []
 		order.extend(loObj.order)
 
-		for l in hexvals:
-			order[order.index(l[0])] = l
+		if len(loObj.order) - 1 > -1:
+			for l in hexvals:
+				if not l[0] in range(len(loObj.order)): continue # a quick hacky fix?
+				loObj.order[loObj.order.index(l[0])] = l
 		
 		for l in hexvals:
 			num_items = self.actLi.GetItemCount()
@@ -1250,22 +1247,25 @@ class SettingsFrame(BaseFrame):
 	# - Events
 	def OBpluginsPathSearch(self, event):
 		'''Try to determine OB plugins.txt path and paste it into the box.'''
-		if meat.get_txt_path(modeOB):
-			self.OBpluginsBox.SetValue(meat.get_txt_path(modeOB))
+		tmp = meat.get_txt_path(modeOB)
+		if tmp != False:
+			self.OBpluginsBox.SetValue(tmp)
 		else:
 			self.OBpluginsBox.SetValue('')
 			
 	def FOpluginsPathSearch(self, event):
 		'''Try to determine OB plugins.txt path and paste it into the box.'''
-		if meat.get_txt_path(modeFO):
-			self.FOpluginsBox.SetValue(meat.get_txt_path(modeFO))
+		tmp = meat.get_txt_path(modeFO)
+		if tmp != False:
+			self.FOpluginsBox.SetValue(tmp)
 		else:
 			self.FOpluginsBox.SetValue('')
 			
 	def NVpluginsPathSearch(self, event):
 		'''Try to determine NV plugins.txt path and paste it into the box.'''
-		if meat.get_txt_path(modeNV):
-			self.NVpluginsBox.SetValue(meat.get_txt_path(modeNV))
+		tmp = meat.get_txt_path(modeNV)	#To hopefully prevent some very obscure issue where the second call to get_txt_path returns false while the first one did not
+		if tmp != False:
+			self.NVpluginsBox.SetValue(tmp)
 		else:
 			self.NVpluginsBox.SetValue('')
 			

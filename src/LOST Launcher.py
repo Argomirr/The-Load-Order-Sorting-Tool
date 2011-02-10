@@ -5,8 +5,8 @@
 '''Launches the LOST application.'''
 
 __author__ = 'Argomirr (argomirr@gmail.com)'
-__version__ = 'Revision: 1.0.0'
-__date__ = 'Date: 2011/11/01 20:42:17'
+__version__ = 'Revision: 1.0.1'
+__date__ = 'Date: 2011/10/02 19:30:29'
 __copyright__ = 'Copyright (c) 2010 Argomirr'
 
 
@@ -23,5 +23,5 @@ def main():
 	
 	
 if __name__ == '__main__':
-		main()
+	main()
 

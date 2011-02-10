@@ -247,9 +247,14 @@ def get_mod_details(path):
 				dataSize = struct.unpack('H', f.read(2))[0]
 				data['description'] = f.read(dataSize).replace('\x00', '')
 				hedr = f.read(4)
-			if hedr == 'MAST':
-				dataSize = struct.unpack('H', f.read(2))[0]
-				data['masters'] = f.read(dataSize).replace('\x00', '')
+			while hedr == 'MAST' or hedr == 'DATA':
+				if hedr == 'MAST':
+					dataSize = struct.unpack('H', f.read(2))[0]
+					data['masters'] += f.read(dataSize).replace('\x00', '') + '\n'
+				else:
+					dataSize = struct.unpack('H', f.read(2))[0]
+					f.seek(f.tell()+dataSize)
+				hedr = f.read(4)
 		finally:
 			f.close()
 	except IOError:
