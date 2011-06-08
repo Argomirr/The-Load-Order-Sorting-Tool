@@ -22,6 +22,7 @@ LO_BASE_TIMESTAMP = 1286604027.0
 modeOB = 'OB'
 modeNV = 'NV'
 modeFO = 'FO3'
+modeSK = 'SK'
 
 
 class LoadOrderError(Exception):
@@ -69,6 +70,8 @@ class LoadOrder:
 			self.type = 'OB'
 		elif 'FalloutNV.esm' in self.actMasters:
 			self.type = 'NV'
+		elif 'Skyrim.esm' in self.actMasters:	# Check for correctness when Skyrim is available
+			self.type = 'SK'
 		else:
 			self.type = 'UNKNOWN'
 
@@ -116,6 +119,8 @@ class LoadOrder:
 			self.type = 'OB'
 		elif 'FalloutNV.esm' in self.actMasters:
 			self.type = 'NV'
+		elif 'Skyrim.esm' in self.actMasters:	# Check for correctness when Skyrim is available
+			self.type = 'SK'
 		else:
 			self.type = 'UNKNOWN'
 			
@@ -211,6 +216,13 @@ def get_txt_path(game=modeFO):
 			return os.path.exists(os.environ['USERPROFILE'] + '\\Local Settings\\Application Data\\FalloutNV\\plugins.txt')
 		else:
 			return False	
+	elif game == modeSK:	# Check for correctness when Skyrim is available
+		if os.path.exists(os.environ['USERPROFILE'] + '\\AppData\\Local\\Skyrim\\plugins.txt'):
+			return os.environ['USERPROFILE'] + '\\AppData\\Local\\Skyrim\\plugins.txt'
+		elif os.path.exists(os.environ['USERPROFILE'] + '\\Local Settings\\Application Data\\Skyrim\\plugins.txt'):
+			return os.path.exists(os.environ['USERPROFILE'] + '\\Local Settings\\Application Data\\Skyrim\\plugins.txt')
+		else:
+			return False
 	else:
 		if os.path.exists(os.environ['USERPROFILE'] + '\\AppData\\Local\\Oblivion\\plugins.txt'):
 			return os.environ['USERPROFILE'] + '\\AppData\\Local\\Oblivion\\plugins.txt'
@@ -219,7 +231,7 @@ def get_txt_path(game=modeFO):
 		else:
 			return False
 			
-def get_mod_details(path):
+def get_mod_details(path):	# Check for correctness when Skyrim is available
 	'''Parse the first few headers of an .esp/.esm file and return a dictionary containing the data.'''
 	data = {'author':'', 'description':'', 'masters':''}
 	if path.endswith('.esp') == False and path.endswith('.esm') == False: raise TES4ModError('Invalid extension')

@@ -5,8 +5,8 @@
 '''Launches the LOST application.'''
 
 __author__ = 'Argomirr (argomirr@gmail.com)'
-__version__ = 'Revision: 1.0.1'
-__date__ = 'Date: 2011/10/02 19:30:29'
+__version__ = 'Revision: 1.1.0 (Skyrim branch)'
+__date__ = 'Date: 2011/06/08 18:24:30'
 __copyright__ = 'Copyright (c) 2010 Argomirr'
 
 

@@ -23,9 +23,9 @@ import wx, wx.html
 # -- CONSTANTS
 constants = {'WINDOW_HEIGHT':600,
 			'WINDOW_WIDTH':800,
-			'WINDOW_TITLE':'The Load Order Sorting Tool',
+			'WINDOW_TITLE':'The Load Order Sorting Tool (Experimental Skyrim branch)',
 			'DOCS_LOC':'http://argomirr.webs.com/py/loadorder/docs/docs.html',
-			'ABOUT':'LOST revision 1.0.1\n(c) 2010 Argomirr\n\n\nDesigned for Python 2.6.6 & wxPython 2.8.11.0',
+			'ABOUT':'LOST revision 1.1.0 (Skyrim branch)\n(c) 2010 Argomirr\n\n\nDesigned for Python 2.7 & wxPython 2.8.12.0',
 			'INI_PATH':os.getcwd() + '\settings.ini',
 			'ICO_PATH':os.getcwd() + '\lost.ico',
 			'LOST_DIR':os.getcwd(),
@@ -44,6 +44,7 @@ settings = {}
 modeOB = 'OB'
 modeNV = 'NV'
 modeFO = 'FO3'
+modeSK = 'SK'
 
 
 # -- GUI
@@ -208,6 +209,11 @@ class LoadOrderPanel(wx.Panel):
 						self.show_error('Could not refresh load order. Check if your settings are correct.')
 						return None
 					loObj = meat.LoadOrder(settings['sNV_TXT'], settings['sNV_PATH'] + '\\Data\\', self.mode)
+				elif self.mode == modeSK:
+					if settings['sSK_TXT'] == '' or settings['sSK_PATH'] == '':
+						self.show_error('Could not refresh load order. Check if your settings are correct.')
+						return None
+					loObj = meat.LoadOrder(settings['sSK_TXT'], settings['sSK_PATH'] + '\\Data\\', self.mode)
 				else:
 					if settings['sOB_TXT'] == '' or settings['sOB_PATH'] == '':
 						self.show_error('Could not refresh load order. Check if your settings are correct.')
@@ -721,6 +727,8 @@ class LoadOrderPanel(wx.Panel):
 				res = meat.get_mod_details(settings['sFO_PATH'] + '\\Data\\' + modName)
 			elif self.mode == modeNV:
 				res = meat.get_mod_details(settings['sNV_PATH'] + '\\Data\\' + modName)
+			elif self.mode == modeSK:
+				res = meat.get_mod_details(settings['sSK_PATH'] + '\\Data\\' + modName)
 			else:
 				res = meat.get_mod_details(settings['sOB_PATH'] + '\\Data\\' + modName)
 				
@@ -748,6 +756,8 @@ class LoadOrderPanel(wx.Panel):
 				loObj = meat.LoadOrder(settings['sFO_TXT'], settings['sFO_PATH'] + '\\Data\\', self.mode)
 			elif self.mode == modeNV:
 				loObj = meat.LoadOrder(settings['sNV_TXT'], settings['sNV_PATH'] + '\\Data\\', self.mode)
+			elif self.mode == modeSK:
+				loObj = meat.LoadOrder(settings['sSK_TXT'], settings['sSK_PATH'] + '\\Data\\', self.mode)
 			else:
 				loObj = meat.LoadOrder(settings['sOB_TXT'], settings['sOB_PATH'] + '\\Data\\', self.mode)
 			loObj.list_to_loadorder(loadorder)
@@ -768,6 +778,11 @@ class LoadOrderPanel(wx.Panel):
 					self.show_error('Could not refresh load order. Check if your settings are correct.')
 					return None
 				loObj = meat.LoadOrder(settings['sNV_TXT'], settings['sNV_PATH'] + '\\Data\\', self.mode)
+			elif self.mode == modeSK:
+				if settings['sSK_TXT'] == '' or settings['sSK_PATH'] == '':
+					self.show_error('Could not refresh load order. Check if your settings are correct.')
+					return None
+				loObj = meat.LoadOrder(settings['sSK_TXT'], settings['sSK_PATH'] + '\\Data\\', self.mode)
 			else:
 				if settings['sOB_TXT'] == '' or settings['sOB_PATH'] == '':
 					self.show_error('Could not refresh load order. Check if your settings are correct.')
@@ -904,7 +919,12 @@ class MainFrame(BaseFrame):
 				self.panelOB = LoadOrderPanel(self.notebook, modeOB)
 			else:
 				self.panelOB = UndefPanel(self.notebook)
+			if settings['sSK_PATH'] and settings['sSK_TXT']:
+				self.panelSK = LoadOrderPanel(self.notebook, modeSK)
+			else:
+				self.panelSK = UndefPanel(self.notebook)
 			
+			self.notebook.AddPage(self.panelSK, 'Skyrim')
 			self.notebook.AddPage(self.panelNV, 'New Vegas')
 			self.notebook.AddPage(self.panelFO, 'Fallout 3')
 			self.notebook.AddPage(self.panelOB, 'Oblivion')
@@ -936,6 +956,8 @@ class MainFrame(BaseFrame):
 			self.panelNV.loadorder_to_clipboard()
 		elif self.get_tab() == modeFO and not isinstance(self.panelFO, UndefPanel):
 			self.panelFO.loadorder_to_clipboard()
+		elif self.get_tab() == modeSK and not isinstance(self.panelSK, UndefPanel):
+			self.panelSK.loadorder_to_clipboard()
 		elif not isinstance(self.panelOB, UndefPanel):
 			self.panelOB.loadorder_to_clipboard()
 	
@@ -945,6 +967,8 @@ class MainFrame(BaseFrame):
 			self.panelNV.import_loadorder()
 		elif self.get_tab() == modeFO and not isinstance(self.panelFO, UndefPanel):
 			self.panelFO.import_loadorder()
+		elif self.get_tab() == modeSK and not isinstance(self.panelSK, UndefPanel):
+			self.panelSK.import_loadorder()
 		elif not isinstance(self.panelOB, UndefPanel):
 			self.panelOB.import_loadorder()
 	
@@ -954,6 +978,8 @@ class MainFrame(BaseFrame):
 			self.panelNV.export_loadorder()
 		elif self.get_tab() == modeFO and not isinstance(self.panelFO, UndefPanel):
 			self.panelFO.export_loadorder()
+		elif self.get_tab() == modeSK and not isinstance(self.panelSK, UndefPanel):
+			self.panelSK.export_loadorder()
 		elif not isinstance(self.panelOB, UndefPanel):
 			self.panelOB.export_loadorder()
 		
@@ -973,6 +999,8 @@ class MainFrame(BaseFrame):
 			self.panelNV.refresh_loadorder()
 		elif self.get_tab() == modeFO and not isinstance(self.panelFO, UndefPanel):
 			self.panelFO.refresh_loadorder()
+		elif self.get_tab() == modeSK and not isinstance(self.panelSK, UndefPanel):
+			self.panelSK.refresh_loadorder()
 		elif not isinstance(self.panelOB, UndefPanel):
 			self.panelOB.refresh_loadorder()
 			
@@ -984,6 +1012,8 @@ class MainFrame(BaseFrame):
 			self.panelFO.refresh_loadorder()
 		if not isinstance(self.panelOB, UndefPanel):
 			self.panelOB.refresh_loadorder()
+		if not isinstance(self.panelSK, UndefPanel):
+			self.panelSK.refresh_loadorder()
 	
 	def handle_save_single(self, event=None):
 		'''Call save_loadorder() on current panel.'''
@@ -991,6 +1021,8 @@ class MainFrame(BaseFrame):
 			self.panelNV.save_loadorder()
 		elif self.get_tab() == modeFO and not isinstance(self.panelFO, UndefPanel):
 			self.panelFO.save_loadorder()
+		elif self.get_tab() == modeSK and not isinstance(self.panelSK, UndefPanel):
+			self.panelSK.save_loadorder()
 		elif not isinstance(self.panelOB, UndefPanel):
 			self.panelOB.save_loadorder()
 			
@@ -1002,15 +1034,19 @@ class MainFrame(BaseFrame):
 			self.panelFO.save_loadorder()
 		if not isinstance(self.panelOB, UndefPanel):
 			self.panelOB.save_loadorder()
+		if not isinstance(self.panelSK, UndefPanel):
+			self.panelSK.save_loadorder()
 			
 	def handle_hotkey(self, event=None):
 		'''Handle (global) hotkeys for self and children.'''
 		key = event.GetKeyCode()
 		if key == 49: # 1 key
-			self.set_tab(modeNV)
+			self.set_tab(modeSK)
 		elif key == 50: # 2 key
-			self.set_tab(modeFO)
+			self.set_tab(modeNV)
 		elif key == 51: # 3 key
+			self.set_tab(modeFO)
+		elif key == 52: # 4 key
 			self.set_tab(modeOB)
 		elif key == 27: # ESC key
 			self.handle_exit() # exit program
@@ -1042,10 +1078,12 @@ class MainFrame(BaseFrame):
 			settings['sFO_PATH'] = ini.get('Paths', 'FO3Path')
 			settings['sOB_PATH'] = ini.get('Paths', 'OBPath')
 			settings['sNV_PATH'] = ini.get('Paths', 'NVPath')
+			settings['sSK_PATH'] = ini.get('Paths', 'SKPath')
 			
 			settings['sOB_TXT'] = ini.get('Paths', 'OBPluginPath')
 			settings['sFO_TXT'] = ini.get('Paths', 'FO3PluginPath')
 			settings['sNV_TXT'] = ini.get('Paths', 'NVPluginPath')
+			settings['sSK_TXT'] = ini.get('Paths', 'SKPluginPath')
 		except:
 			self.show_error('Failed to read ini. Check if the file is misssing or damaged.')
 			sys.exit(1)
@@ -1061,20 +1099,24 @@ class MainFrame(BaseFrame):
 	def get_tab(self):
 		'''Return the game tab that is currently displayed.'''
 		if self.notebook.GetSelection() == 0:
-			return modeNV
+			return modeSK
 		elif self.notebook.GetSelection() == 1:
+			return modeNV
+		elif self.notebook.GetSelection() == 2:
 			return modeFO
 		else:
 			return modeOB
 		
 	def set_tab(self, mode):
 		'''Set the game tab that is currently displayed.'''
-		if mode == modeNV:
+		if mode == modeSK:
 			self.notebook.SetSelection(0)
-		elif mode == modeFO:
+		elif mode == modeNV:
 			self.notebook.SetSelection(1)
-		else:
+		elif mode == modeFO:
 			self.notebook.SetSelection(2)
+		else:
+			self.notebook.SetSelection(3)
 			
 	def handle_setting_update(self):
 		'''Apply new settings to GUI.'''
@@ -1085,6 +1127,8 @@ class MainFrame(BaseFrame):
 				self.panelFO.show_descr_box()
 			if not isinstance(self.panelOB, UndefPanel):
 				self.panelOB.show_descr_box()
+			if not isinstance(self.panelSK, UndefPanel):
+				self.panelSK.show_descr_box()
 		else:
 			if not isinstance(self.panelNV, UndefPanel):
 				self.panelNV.show_descr_box(False)
@@ -1092,15 +1136,17 @@ class MainFrame(BaseFrame):
 				self.panelFO.show_descr_box(False)
 			if not isinstance(self.panelOB, UndefPanel):
 				self.panelOB.show_descr_box(False)
+			if not isinstance(self.panelSK, UndefPanel):
+				self.panelSK.show_descr_box(False)
 			
 
 # SettingsFrame class needs to be tidied some time
 class SettingsFrame(BaseFrame):
 	'''Frame for modifying INI settings.'''
-	def __init__(self, parent, panelTitle='Settings', panelSize=(450,500), defaults={}):
+	def __init__(self, parent, panelTitle='Settings', panelSize=(450,565), defaults={}):
 		wx.Frame.__init__(self, parent, wx.ID_ANY, panelTitle, size=panelSize, style=wx.STAY_ON_TOP|wx.DEFAULT_FRAME_STYLE^(wx.MINIMIZE_BOX))
 		self.SetIcon(wx.Icon(constants['ICO_PATH'], wx.BITMAP_TYPE_ICO))
-		self.SetMinSize((300, 480))		
+		self.SetMinSize((300, 565))		
 		self.Center()
 		
 		backgrnd = wx.Panel(self)
@@ -1108,12 +1154,14 @@ class SettingsFrame(BaseFrame):
 		self.parent = parent
 		
 		# Default game
-		self.gameChoicesOptions = ['Fallout 3', 'Oblivion', 'New Vegas']
+		self.gameChoicesOptions = ['Fallout 3', 'Oblivion', 'New Vegas', 'Skyrim']
 		self.gameBox = wx.RadioBox(backgrnd, wx.ID_ANY, 'Default game', choices=self.gameChoicesOptions, style=wx.VERTICAL)
 		if defaults['sDEF_MODE'] == modeFO:
 			self.gameBox.SetSelection(0)
 		elif defaults['sDEF_MODE'] == modeOB:
 			self.gameBox.SetSelection(1)
+		elif defaults['sDEF_MODE'] == modeSK:
+			self.gameBox.SetSelection(3)
 		else:
 			self.gameBox.SetSelection(2)
 		
@@ -1176,6 +1224,22 @@ class SettingsFrame(BaseFrame):
 		self.NVbrowseBtn2 = wx.Button(backgrnd, label='Browse')
 		self.NVbrowseBtn2.Bind(wx.EVT_BUTTON, self.NVbrowse2)
 		
+		# Skyrim
+		label8 = wx.StaticText(backgrnd, wx.ID_ANY, label=' Skyrim path')
+		self.SKPathBox = wx.TextCtrl(backgrnd, style=wx.TE_PROCESS_ENTER)
+		self.SKPathBox.SetValue(defaults['sSK_PATH'])
+		self.SKbrowseBtn = wx.Button(backgrnd, label='Browse')
+		self.SKbrowseBtn.Bind(wx.EVT_BUTTON, self.NVbrowse1)
+		
+		label9 = wx.StaticText(backgrnd, wx.ID_ANY, label=' Skyrim plugins.txt')
+		self.SKpluginsBox = wx.TextCtrl(backgrnd, style=wx.TE_PROCESS_ENTER)
+		self.SKpluginsBox.SetValue(defaults['sSK_TXT'])
+		self.SKsearchBtn = wx.Button(backgrnd, label='Auto')
+		self.SKsearchBtn.Bind(wx.EVT_BUTTON, self.SKpluginsPathSearch)
+		self.SKbrowseBtn2 = wx.Button(backgrnd, label='Browse')
+		self.SKbrowseBtn2.Bind(wx.EVT_BUTTON, self.SKbrowse2)
+		
+		
 		self.exitBtn = wx.Button(backgrnd, label='Save')
 		self.exitBtn.Bind(wx.EVT_BUTTON, self.exit)
 		
@@ -1216,24 +1280,39 @@ class SettingsFrame(BaseFrame):
 		hBox7.Add(self.NVpluginsBox, proportion=3, flag=wx.EXPAND)
 		hBox7.Add(self.NVsearchBtn, proportion=0)
 		hBox7.Add(self.NVbrowseBtn2, proportion=0)
+		
+		# SK settings
+		hBox8 = wx.BoxSizer()
+		hBox8.Add(self.SKPathBox, proportion=3, flag=wx.EXPAND)
+		hBox8.Add(self.SKbrowseBtn, proportion=0)
+		
+		hBox9 = wx.BoxSizer()
+		hBox9.Add(self.SKpluginsBox, proportion=3, flag=wx.EXPAND)
+		hBox9.Add(self.SKsearchBtn, proportion=0)
+		hBox9.Add(self.SKbrowseBtn2, proportion=0)
 
 		
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		sizer.Add(wx.StaticText(backgrnd, wx.ID_ANY, label='You may have to restart LOST in order for your changes to take effect!'), border=8, proportion=0, flag=wx.EXPAND|wx.ALL)
 		sizer.Add(hBox1, flag=wx.EXPAND|wx.ALL, border=5)
-		sizer.Add(label1, border=5, flag=wx.ALL)
-		sizer.Add(hBox2, border=3, flag=wx.EXPAND|wx.ALL)
-		sizer.Add(label2, border=5, flag=wx.ALL)
-		sizer.Add(hBox3, border=3, flag=wx.EXPAND|wx.ALL)
-		sizer.Add(label3, border=5, flag=wx.ALL)
-		sizer.Add(hBox4, border=3, flag=wx.EXPAND|wx.ALL)
-		sizer.Add(label4, border=5, flag=wx.ALL)
-		sizer.Add(hBox5, border=3, flag=wx.EXPAND|wx.ALL)
+		sizer.Add(label1, border=3, flag=wx.ALL)
+		sizer.Add(hBox2, border=1, flag=wx.EXPAND|wx.ALL)
+		sizer.Add(label2, border=3, flag=wx.ALL)
+		sizer.Add(hBox3, border=1, flag=wx.EXPAND|wx.ALL)
+		sizer.Add(label3, border=3, flag=wx.ALL)
+		sizer.Add(hBox4, border=1, flag=wx.EXPAND|wx.ALL)
+		sizer.Add(label4, border=3, flag=wx.ALL)
+		sizer.Add(hBox5, border=1, flag=wx.EXPAND|wx.ALL)
 		
-		sizer.Add(label5, border=5, flag=wx.ALL)
-		sizer.Add(hBox6, border=3, flag=wx.EXPAND|wx.ALL)
-		sizer.Add(label6, border=5, flag=wx.ALL)
-		sizer.Add(hBox7, border=3, flag=wx.EXPAND|wx.ALL)
+		sizer.Add(label5, border=3, flag=wx.ALL)
+		sizer.Add(hBox6, border=1, flag=wx.EXPAND|wx.ALL)
+		sizer.Add(label6, border=3, flag=wx.ALL)
+		sizer.Add(hBox7, border=1, flag=wx.EXPAND|wx.ALL)
+		
+		sizer.Add(label8, border=3, flag=wx.ALL)
+		sizer.Add(hBox8, border=1, flag=wx.EXPAND|wx.ALL)
+		sizer.Add(label9, border=3, flag=wx.ALL)
+		sizer.Add(hBox9, border=1, flag=wx.EXPAND|wx.ALL)
 		
 		sizer.Add(wx.StaticLine(backgrnd, style=wx.LI_VERTICAL), border=3, proportion=0, flag=wx.EXPAND|wx.ALL)
 		sizer.Add(self.exitBtn, proportion=0, flag=wx.ALIGN_RIGHT)
@@ -1269,6 +1348,14 @@ class SettingsFrame(BaseFrame):
 		else:
 			self.NVpluginsBox.SetValue('')
 			
+	def SKpluginsPathSearch(self, event):
+		'''Try to determine SK plugins.txt path and paste it into the box.'''
+		tmp = meat.get_txt_path(modeSK)	#To hopefully prevent some very obscure issue where the second call to get_txt_path returns false while the first one did not
+		if tmp != False:
+			self.SKpluginsBox.SetValue(tmp)
+		else:
+			self.SKpluginsBox.SetValue('')
+			
 	def OBbrowse1(self, event):
 		'''Browse for Oblivion directory.'''
 		self.OBPathBox.SetValue(self.browse_dir())
@@ -1293,6 +1380,14 @@ class SettingsFrame(BaseFrame):
 		'''Browse for New Vegas plugins.txt.'''
 		self.NVpluginsBox.SetValue(self.browse_file())
 		
+	def SKbrowse1(self, event):
+		'''Browse for Skyrim directory.'''
+		self.SKPathBox.SetValue(self.browse_dir())
+		
+	def SKbrowse2(self, event):
+		'''Browse for Skyrim plugins.txt.'''
+		self.SKpluginsBox.SetValue(self.browse_dir())
+		
 	def exit(self, event):
 		'''Save data to INI and destroy frame.'''
 		set = self.get_settings()
@@ -1311,6 +1406,8 @@ class SettingsFrame(BaseFrame):
 		ini.set('Paths', 'OBPluginPath', set['sOB_TXT'])
 		ini.set('Paths', 'NVPath', set['sNV_PATH'])
 		ini.set('Paths', 'NVPluginPath', set['sNV_TXT'])
+		ini.set('Paths', 'SKPath', set['sSK_PATH'])
+		ini.set('Paths', 'SKPluginPath', set['sSK_TXT'])
 		
 		try:
 			fil = open(constants['INI_PATH'], 'w')
@@ -1333,8 +1430,10 @@ class SettingsFrame(BaseFrame):
 			settings['sDEF_MODE'] = modeFO
 		elif self.gameBox.GetSelection() == 1:
 			settings['sDEF_MODE'] = modeOB
-		else:
+		elif self.gameBox.GetSelection() == 2:
 			settings['sDEF_MODE'] = modeNV
+		else:
+			settings['sDEF_MODE'] = modeSK
 			
 		settings['bSHOW_DESCR'] = self.descrBox.GetSelection()
 		settings['bSAVE_EXIT'] = self.saveBox.GetSelection()
@@ -1343,10 +1442,12 @@ class SettingsFrame(BaseFrame):
 		settings['sFO_PATH'] = self.FOPathBox.GetValue()
 		settings['sOB_PATH'] = self.OBPathBox.GetValue()
 		settings['sNV_PATH'] = self.NVPathBox.GetValue()
+		settings['sSK_PATH'] = self.SKPathBox.GetValue()
 		
 		settings['sOB_TXT'] = self.OBpluginsBox.GetValue()
 		settings['sFO_TXT'] = self.FOpluginsBox.GetValue()
 		settings['sNV_TXT'] = self.NVpluginsBox.GetValue()
+		settings['sSK_TXT'] = self.SKpluginsBox.GetValue()
 		
 		return settings
 		
