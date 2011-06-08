@@ -1,3 +1,0 @@
-This is a seperate branch of the LOST repository for Skyrim compatibility. It has been put into a separate branch because Skyrim has not been released yet, meaning the code can not be tested. It is therefore based entirely on assumptions about the way the new engine handles plugins (I'm assuming it's similar to the way the old engine handled them - it's basically an overhauled Gamebryo engine if my information is correct) so changes may have to be made to when information about the new engine is available.
-
-BOSS wrapper code has not been updated as of yet. I'm holding off to see if the BOSS team decides to make a Skyrim port before doing so.
