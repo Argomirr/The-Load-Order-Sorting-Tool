@@ -15,6 +15,7 @@ import os
 import sys
 import re
 import webbrowser
+import platform
 
 import iniparse
 import wx, wx.html
@@ -26,8 +27,9 @@ constants = {'WINDOW_HEIGHT':600,
 			'WINDOW_TITLE':'The Load Order Sorting Tool',
 			'DOCS_LOC':'http://argomirr.webs.com/py/loadorder/docs/docs.html',
 			'ABOUT':'LOST revision 1.0.1\n(c) 2010 Argomirr\n\n\nDesigned for Python 2.6.6 & wxPython 2.8.11.0',
-			'INI_PATH':os.getcwd() + '\settings.ini',
-			'ICO_PATH':os.getcwd() + '\lost.ico',
+			'INI_PATH':os.getcwd() + '\\settings.ini',
+			'ICO_PATH':os.getcwd() + '\\lost.ico',
+			'ICO_PATH_S':os.getcwd() + '\\lost16x16.ico',
 			'LOST_DIR':os.getcwd(),
 			'BOSS_START_PAGE':'''<html><body><center><h3>Better Oblivion Sorting Software</h3>BOSS is &copy; Random007 &amp; the BOSS development team, 2009-2010. Some rights reserved.</center><br><br>
 								<p><i>Better Oblivion Sorting Software (BOSS) will reorder your mods to their correct positions (as listed in the masterlist.txt database file), putting any mods it doesn't
@@ -47,6 +49,14 @@ modeFO = 'FO3'
 
 
 # -- GUI
+def get_os_safe_icon():	
+	'''Return appropriate icon path for current os.'''
+	# Windows XP can't handle the high res icon, so make sure it gets the right one
+	if platform.system() == 'Windows' and platform.release() == 'XP':
+		return constants['ICO_PATH_S']
+	else:
+		return constants['ICO_PATH']
+		
 class UndefPanel(wx.Panel):
 	'''Panel class for panel displayed when settings have not been configured.'''
 	def __init__(self, parent, id=wx.ID_ANY):
@@ -843,7 +853,7 @@ class MainFrame(BaseFrame):
 	def __init__(self):
 		wx.Frame.__init__(self, None, title=constants['WINDOW_TITLE'], size=(constants['WINDOW_WIDTH'], constants['WINDOW_HEIGHT']), style=wx.DEFAULT_FRAME_STYLE, id=wx.ID_ANY)	
 		self.Center()
-		self.SetIcon(wx.Icon(constants['ICO_PATH'], wx.BITMAP_TYPE_ICO))
+		self.SetIcon(wx.Icon(get_os_safe_icon(), wx.BITMAP_TYPE_ICO))
 		self.SetMinSize((800, 400))
 		
 		self.load_settings()
@@ -1099,7 +1109,7 @@ class SettingsFrame(BaseFrame):
 	'''Frame for modifying INI settings.'''
 	def __init__(self, parent, panelTitle='Settings', panelSize=(450,500), defaults={}):
 		wx.Frame.__init__(self, parent, wx.ID_ANY, panelTitle, size=panelSize, style=wx.STAY_ON_TOP|wx.DEFAULT_FRAME_STYLE^(wx.MINIMIZE_BOX))
-		self.SetIcon(wx.Icon(constants['ICO_PATH'], wx.BITMAP_TYPE_ICO))
+		self.SetIcon(wx.Icon(get_os_safe_icon(), wx.BITMAP_TYPE_ICO))
 		self.SetMinSize((300, 480))		
 		self.Center()
 		
@@ -1380,7 +1390,8 @@ class SimplerHtmlWindow(wx.html.HtmlWindow):
 class BOSSFrame(BaseFrame):
 	def __init__(self, parent, title='BOSS interface', size=(750,500), defGame=modeNV):
 		wx.Frame.__init__(self, parent, wx.ID_ANY, title, size=size, style=wx.DEFAULT_FRAME_STYLE)
-		self.SetIcon(wx.Icon(constants['ICO_PATH'], wx.BITMAP_TYPE_ICO))
+		self.SetIcon(wx.Icon(get_os_safe_icon(), wx.BITMAP_TYPE_ICO))
+		
 		self.SetMinSize((700, 400))		
 		self.Center()
 		
