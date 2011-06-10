@@ -16,7 +16,7 @@
 	VIAddVersionKey /LANG=${LANG_ENGLISH} "CompanyName" "Argomirr"
 	VIAddVersionKey /LANG=${LANG_ENGLISH} "LegalCopyright" "© Argomirr"
 	VIAddVersionKey /LANG=${LANG_ENGLISH} "FileDescription" "LOST installer"
-	VIAddVersionKey /LANG=${LANG_ENGLISH} "FileVersion" "1.0.0"
+	VIAddVersionKey /LANG=${LANG_ENGLISH} "FileVersion" "1.0.2"
 
   ;Default installation folder
   InstallDir "$PROGRAMFILES\The Load Order Sorting Tool"
@@ -39,7 +39,7 @@
 ;Pages
 
   !insertmacro MUI_PAGE_WELCOME
-  !insertmacro MUI_PAGE_LICENSE
+  !insertmacro MUI_PAGE_LICENSE "License.txt"
   !insertmacro MUI_PAGE_COMPONENTS
   !insertmacro MUI_PAGE_DIRECTORY
   !insertmacro MUI_PAGE_INSTFILES
@@ -65,8 +65,9 @@ Section "LOST (required)" Main
 	File "library.zip"
 	File "LOST Launcher.exe"
 	File "lost.ico"
+	File "lost32x32.ico"
 	File "msvcp90.dll"
-	File "python26.dll"
+	File "python27.dll"
 	File "select.pyd"
 	File "settings.ini"
 	File "unicodedata.pyd"
@@ -108,6 +109,7 @@ SectionEnd
 Section "Shortcut" shortcut
    
     ;Create shortcuts
+	SetOutPath "$INSTDIR"
     CreateShortCut "$DESKTOP\LOST.lnk" "$INSTDIR\LOST Launcher.exe"
   
 SectionEnd
@@ -138,8 +140,9 @@ Section "Uninstall"
 	Delete "$INSTDIR\library.zip"
 	Delete "$INSTDIR\LOST Launcher.exe"
 	Delete "$INSTDIR\lost.ico"
+	Delete "$INSTDIR\lost32x32.ico"	
 	Delete "$INSTDIR\msvcp90.dll"
-	Delete "$INSTDIR\python26.dll"
+	Delete "$INSTDIR\python27.dll"
 	Delete "$INSTDIR\select.pyd"
 	Delete "$INSTDIR\settings.ini"
 	Delete "$INSTDIR\unicodedata.pyd"

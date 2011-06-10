@@ -26,11 +26,10 @@ constants = {'WINDOW_HEIGHT':600,
 			'WINDOW_WIDTH':800,
 			'WINDOW_TITLE':'The Load Order Sorting Tool',
 			'DOCS_LOC':'http://argomirr.webs.com/py/loadorder/docs/docs.html',
-			'ABOUT':'LOST revision 1.0.1\n(c) 2010 Argomirr\n\n\nDesigned for Python 2.6.6 & wxPython 2.8.11.0',
-			'INI_PATH':os.getcwd() + '\\settings.ini',
-			'ICO_PATH':os.getcwd() + '\\lost.ico',
-			'ICO_PATH_S':os.getcwd() + '\\lost16x16.ico',
-			'LOST_DIR':os.getcwd(),
+			'ABOUT':'LOST revision 1.0.2\n(c) 2010 Argomirr\n\n\nDesigned for Python 2.7 & wxPython 2.8.12.0',
+			'INI_PATH':'settings.ini',
+			'ICO_PATH':'lost.ico',
+			'ICO_PATH_S':'lost32x32.ico',
 			'BOSS_START_PAGE':'''<html><body><center><h3>Better Oblivion Sorting Software</h3>BOSS is &copy; Random007 &amp; the BOSS development team, 2009-2010. Some rights reserved.</center><br><br>
 								<p><i>Better Oblivion Sorting Software (BOSS) will reorder your mods to their correct positions (as listed in the masterlist.txt database file), putting any mods it doesn't
 								 recognise after them, in the same order as they were before BOSS was run.
